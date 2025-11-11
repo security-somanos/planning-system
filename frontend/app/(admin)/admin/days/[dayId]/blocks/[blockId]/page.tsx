@@ -18,7 +18,7 @@ type BlockFormState = {
   title: string;
   description?: string;
   startTime: string;
-  endTime: string;
+  endTime: string | null;
   endTimeFixed?: boolean;
   locationId?: string;
   participantsIds: string[];
@@ -35,7 +35,7 @@ function emptyForm(): BlockFormState {
     title: "",
     description: "",
     startTime: "09:00",
-    endTime: "10:00",
+    endTime: null,
     endTimeFixed: false, // Default to auto end time
     locationId: undefined,
     participantsIds: [],
@@ -113,7 +113,7 @@ export default function BlockEditorPage() {
               title: foundBlock.title,
               description: foundBlock.description,
               startTime: foundBlock.startTime,
-              endTime: foundBlock.endTime,
+              endTime: foundBlock.endTime ?? null,
               endTimeFixed: foundBlock.endTimeFixed === true, // Default to false (auto) if not set
               locationId: foundBlock.locationId,
               participantsIds: foundBlock.participantsIds || [],
@@ -198,7 +198,7 @@ export default function BlockEditorPage() {
         title: form.title,
         description: form.description,
         startTime: form.startTime,
-        endTime: form.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(form.scheduleItems) || form.endTime) : form.endTime,
+        endTime: form.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(form.scheduleItems) ?? form.endTime) : (form.endTime ?? ""),
         endTimeFixed: form.endTimeFixed === true, // Save as false (auto) if not explicitly true
         locationId: form.locationId,
         participantsIds: form.participantsIds,
@@ -298,7 +298,7 @@ export default function BlockEditorPage() {
                       ...f,
                       endTimeFixed: fixed,
                       // If enabling auto, calculate from schedule items (or keep current if not calculable)
-                      endTime: fixed ? f.endTime : (calculateEndTimeFromScheduleItems(f.scheduleItems) || f.endTime),
+                      endTime: fixed ? (f.endTime ?? "") : (calculateEndTimeFromScheduleItems(f.scheduleItems) ?? f.endTime ?? ""),
                     }));
                   }}
                   className="cursor-pointer"
@@ -320,8 +320,8 @@ export default function BlockEditorPage() {
             ) : (
               <Input
                 type="time"
-                value={form.endTime}
-                onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
+                value={form.endTime ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value || null }))}
               />
             )}
           </div>
@@ -640,7 +640,7 @@ export default function BlockEditorPage() {
                             ...f,
                             scheduleItems: updatedItems,
                             // Update endTime if auto is enabled
-                            endTime: f.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(updatedItems) || f.endTime) : f.endTime,
+                            endTime: f.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(updatedItems) ?? f.endTime) : f.endTime,
                           };
                         });
                       }}
@@ -667,7 +667,7 @@ export default function BlockEditorPage() {
                           ...f,
                           scheduleItems: updatedItems,
                           // Update endTime if auto is enabled
-                          endTime: f.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(updatedItems) || f.endTime) : f.endTime,
+                          endTime: f.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(updatedItems) ?? f.endTime) : f.endTime,
                         };
                       });
                     }}
@@ -734,7 +734,7 @@ export default function BlockEditorPage() {
                     ...f,
                     scheduleItems: updatedItems,
                     // Update endTime if auto is enabled
-                    endTime: f.endTimeFixed === false ? calculateEndTimeFromScheduleItems(updatedItems) : f.endTime,
+                    endTime: f.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(updatedItems) ?? f.endTime) : f.endTime,
                   };
                 });
               }}

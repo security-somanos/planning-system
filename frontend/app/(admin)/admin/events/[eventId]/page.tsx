@@ -161,7 +161,7 @@ export default function EventViewPage() {
                 {days.map((d) => (
                   <Link
                     key={d.id}
-                    href={`/admin/events/${eventId}/days/${d.id}`}
+                    href={`/admin/days/${d.id}`}
                     className="rounded-lg border border-zinc-200 bg-white p-4 hover:shadow-sm"
                   >
                     <div className="font-medium">{d.date}</div>
