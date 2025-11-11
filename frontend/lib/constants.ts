@@ -1,0 +1,41 @@
+export const PARTICIPANT_ROLES = [
+  "Drivers",
+  "Reporters",
+  "decans",
+  "Order St. Andrew",
+  "Vehicules Tours",
+  "Directors",
+  "Advanced team members (on Site manager)",
+  "The venue manager (External)",
+  "Multimedia (Photographer and videographer Internal)",
+] as const;
+
+export const LANGUAGES = [
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Italian",
+  "Portuguese",
+  "Russian",
+  "Chinese (Mandarin)",
+  "Japanese",
+  "Korean",
+  "Arabic",
+  "Turkish",
+  "Greek",
+  "Dutch",
+  "Polish",
+  "Swedish",
+  "Norwegian",
+  "Danish",
+  "Finnish",
+  "Hebrew",
+  "Hindi",
+  "Thai",
+  "Vietnamese",
+  "Indonesian",
+  "Malay",
+] as const;
+
+
