@@ -5,23 +5,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 )
 
 type Config struct {
-	Env          string
-	Port         string
-	DatabaseURL  string
-	LogLevel     string
-	CORSOrigins  []string
-	AutoMigrate  bool
-	AutoSeed     bool
+	Env         string
+	Port        string
+	DatabaseURL string
+	LogLevel    string
+	CORSOrigins []string
+	AutoMigrate bool
+	AutoSeed    bool
 }
 
 func Load() Config {
-	_ = godotenv.Load()
-
+	// Read directly from environment variables
+	// .env files are only for local development or docker-compose injection
 	cfg := Config{
 		Env:         getEnv("ENV", "dev"),
 		Port:        getEnv("PORT", "8080"),
@@ -71,5 +70,3 @@ func getEnv(key, def string) string {
 	}
 	return val
 }
-
-
