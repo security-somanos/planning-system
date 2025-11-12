@@ -5,13 +5,34 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"planning-system/backend/internal/auth"
 	"planning-system/backend/internal/models"
 	"planning-system/backend/internal/repos"
 	"planning-system/backend/pkg/respond"
 )
 
 func (h *Handlers) ListMovements(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.GetUserFromContext(r)
+	if !ok {
+		respond.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	dayID := chi.URLParam(r, "dayId")
+	
+	// Check involvement if not admin
+	if user.Role != "admin" {
+		involved, err := h.sv.Involvement.IsUserInvolvedInDay(r.Context(), user.ID, dayID)
+		if err != nil {
+			respond.Error(w, http.StatusInternalServerError, "failed to check involvement")
+			return
+		}
+		if !involved {
+			respond.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
+	}
+
 	items, err := h.sv.Movements.ListByDay(r.Context(), dayID)
 	if err != nil {
 		respond.Error(w, http.StatusInternalServerError, "failed to list movements")
@@ -21,8 +42,28 @@ func (h *Handlers) ListMovements(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) GetMovement(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.GetUserFromContext(r)
+	if !ok {
+		respond.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	dayID := chi.URLParam(r, "dayId")
 	id := chi.URLParam(r, "movementId")
+	
+	// Check involvement if not admin
+	if user.Role != "admin" {
+		involved, err := h.sv.Involvement.IsUserInvolvedInDay(r.Context(), user.ID, dayID)
+		if err != nil {
+			respond.Error(w, http.StatusInternalServerError, "failed to check involvement")
+			return
+		}
+		if !involved {
+			respond.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
+	}
+
 	item, err := h.sv.Movements.Get(r.Context(), dayID, id)
 	if err != nil {
 		respond.Error(w, http.StatusNotFound, "movement not found")

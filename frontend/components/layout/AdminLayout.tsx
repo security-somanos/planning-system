@@ -1,15 +1,16 @@
 'use client';
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
-import { Calendar, Users, Car, MapPin, FileText, LogOut, LucideIcon } from "lucide-react";
+import { Calendar, Users, Car, MapPin, FileText, UserCog, LogOut, LucideIcon } from "lucide-react";
 import { RequireRole } from "../../components/auth/RequireRole";
-import { logout } from "../../lib/session";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "../ui/Button";
 
 const nav: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/admin", label: "Days", icon: Calendar },
   { href: "/admin/participants", label: "Participants", icon: Users },
+  { href: "/admin/users", label: "Users", icon: UserCog },
   { href: "/admin/vehicles", label: "Vehicles", icon: Car },
   { href: "/admin/locations", label: "Locations", icon: MapPin },
   { href: "/admin/itinerary", label: "Itinerary", icon: FileText },
@@ -35,11 +36,7 @@ function NavLink({ href, label, icon: Icon }: { href: string; label: string; ico
 }
 
 export function AdminLayout({ children, title }: { children: ReactNode; title?: string }) {
-  const router = useRouter();
-  const onLogout = () => {
-    logout();
-    router.replace("/login");
-  };
+  const { logout } = useAuth();
   return (
     <RequireRole role="admin">
       <div className="flex min-h-screen bg-zinc-50">
@@ -55,7 +52,7 @@ export function AdminLayout({ children, title }: { children: ReactNode; title?: 
               ))}
             </nav>
             <div className="border-t border-zinc-200 p-3">
-              <Button variant="secondary" onClick={onLogout} className="w-full flex items-center justify-center gap-2">
+              <Button variant="secondary" onClick={logout} className="w-full flex items-center justify-center gap-2">
                 <LogOut className="h-4 w-4" />
                 Logout
               </Button>

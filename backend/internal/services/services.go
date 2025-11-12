@@ -13,6 +13,8 @@ type Services struct {
 	Blocks       *repos.BlocksRepo
 	Movements    *repos.MovementsRepo
 	Itinerary    *repos.ItineraryRepo
+	Users        *repos.UsersRepo
+	Involvement  *repos.InvolvementRepo
 }
 
 func New(pool *pgxpool.Pool) *Services {
@@ -24,6 +26,8 @@ func New(pool *pgxpool.Pool) *Services {
 		Blocks:       repos.NewBlocksRepo(pool),
 		Movements:    repos.NewMovementsRepo(pool),
 		Itinerary:    repos.NewItineraryRepo(pool),
+		Users:        repos.NewUsersRepo(pool),
+		Involvement:  repos.NewInvolvementRepo(pool),
 	}
 }
 

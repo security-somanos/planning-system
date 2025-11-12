@@ -16,6 +16,7 @@ type Config struct {
 	CORSOrigins []string
 	AutoMigrate bool
 	AutoSeed    bool
+	JWTSecret   string
 }
 
 func Load() Config {
@@ -28,6 +29,7 @@ func Load() Config {
 		LogLevel:    strings.ToLower(getEnv("LOG_LEVEL", "info")),
 		AutoMigrate: getEnv("AUTO_MIGRATE", "true") == "true",
 		AutoSeed:    getEnv("AUTO_SEED", "true") == "true",
+		JWTSecret:   getEnv("JWT_SECRET", "change-this-secret-key-in-production"),
 	}
 	cors := getEnv("CORS_ORIGINS", "")
 	if cors == "" {

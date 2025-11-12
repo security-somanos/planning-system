@@ -1,110 +1,106 @@
 'use client';
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { mockApi } from "../../../lib/mockApi";
-import { loginAsAdmin, loginAsParticipant, getRole } from "../../../lib/session";
-import { Button } from "../../../components/ui/Button";
-import { Participant } from "../../../lib/types";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
+
+interface LoginResponse {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    role: 'admin' | 'user';
+    createdAt?: string;
+    updatedAt?: string;
+  };
+}
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [participantId, setParticipantId] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
+  const { login, loading: authLoading } = useAuth();
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
-  useEffect(() => {
-    const r = getRole();
-    if (r === "admin") router.replace("/admin");
-    else if (r === "participant") router.replace("/portal");
-  }, [router]);
-
-  useEffect(() => {
-    let mounted = true;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
     setLoading(true);
-    mockApi
-      .get<{ items: Participant[] }>("/participants")
-      .then((res) => {
-        if (!mounted) return;
-        setParticipants(res.items);
-        if (res.items.length > 0) setParticipantId(res.items[0].id);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setError("Failed to load participants.");
-      })
-      .finally(() => mounted && setLoading(false));
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
-  const onAdmin = () => {
-    loginAsAdmin();
-    router.replace("/admin");
-  };
-  const onParticipant = () => {
-    if (!participantId) return;
-    loginAsParticipant(participantId);
-    router.replace("/portal");
+    try {
+      const response = await api.post<LoginResponse>(
+        '/auth/login',
+        { email, password },
+        false // Don't require auth for login
+      );
+      
+      login(response.token, response.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const participantOptions = useMemo(
-    () =>
-      participants.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name} ({Array.isArray((p as any).roles) && (p as any).roles.length ? (p as any).roles.join(", ") : "—"})
-        </option>
-      )),
-    [participants]
-  );
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <div className="text-sm text-zinc-600">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-6">
       <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h1 className="text-2xl font-semibold mb-4">Event & Trip Planning</h1>
         <p className="text-sm text-zinc-600 mb-6">
-          Choose how you want to sign in (mock login).
+          Sign in to your account
         </p>
 
-        <div className="space-y-6">
-          <div className="rounded-lg border border-zinc-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">Admin</div>
-                <div className="text-xs text-zinc-600">
-                  Full control panel access
-                </div>
-              </div>
-              <Button onClick={onAdmin}>Continue</Button>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+              {error}
             </div>
+          )}
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent"
+              placeholder="user@example.com"
+              disabled={loading}
+            />
           </div>
 
-          <div className="rounded-lg border border-zinc-200 p-4">
-            <div className="mb-3">
-              <div className="font-medium">Participant</div>
-              <div className="text-xs text-zinc-600">
-                See only your personal agenda
-              </div>
-            </div>
-            {loading ? (
-              <div className="text-sm text-zinc-600">Loading participants…</div>
-            ) : error ? (
-              <div className="text-sm text-red-600">{error}</div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <select
-                  value={participantId}
-                  onChange={(e) => setParticipantId(e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
-                >
-                  {participantOptions}
-                </select>
-                <Button onClick={onParticipant}>Continue</Button>
-              </div>
-            )}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-zinc-700 mb-1">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent"
+              placeholder="••••••••"
+              disabled={loading}
+            />
           </div>
-        </div>
+
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? 'Signing in...' : 'Sign in'}
+          </Button>
+        </form>
       </div>
     </div>
   );

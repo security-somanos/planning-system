@@ -1,29 +1,44 @@
 'use client';
-import { ReactNode, useEffect, useState } from "react";
-import { getRole, Role } from "../../lib/session";
+import { ReactNode, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+
+type Role = 'admin' | 'participant';
 
 export function RequireRole(props: { role: Role; children: ReactNode }) {
   const { role, children } = props;
+  const { loading, isAuthenticated, user } = useAuth();
   const router = useRouter();
-  const [ok, setOk] = useState(false);
+  const userRole = user ? (user.role === 'admin' ? 'admin' : 'participant') : null;
 
   useEffect(() => {
-    const r = getRole();
-    if (r !== role) {
-      router.replace("/login");
-      return;
+    if (!loading && (!isAuthenticated || userRole !== role)) {
+      if (!isAuthenticated) {
+        router.replace('/login');
+      } else if (userRole === 'admin' && role === 'participant') {
+        router.replace('/admin');
+      } else if (userRole === 'participant' && role === 'admin') {
+        router.replace('/portal');
+      }
     }
-    setOk(true);
-  }, [router, role]);
+  }, [loading, isAuthenticated, userRole, role, router]);
 
-  if (!ok) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-zinc-600">
         Checking access…
       </div>
     );
   }
+
+  if (!isAuthenticated || userRole !== role) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-zinc-600">
+        Access denied. Redirecting…
+      </div>
+    );
+  }
+
   return <>{children}</>;
 }
 

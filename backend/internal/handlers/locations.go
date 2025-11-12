@@ -5,27 +5,80 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"planning-system/backend/internal/auth"
 	"planning-system/backend/internal/models"
 	"planning-system/backend/internal/repos"
 	"planning-system/backend/pkg/respond"
 )
 
 func (h *Handlers) ListLocations(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.GetUserFromContext(r)
+	if !ok {
+		respond.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	items, err := h.sv.Locations.List(r.Context())
 	if err != nil {
 		respond.Error(w, http.StatusInternalServerError, "failed to list locations")
 		return
 	}
+
+	// Filter by involvement if not admin
+	if user.Role != "admin" {
+		locationIDs, err := h.sv.Involvement.GetLocationsForUser(r.Context(), user.ID)
+		if err != nil {
+			h.log.Error().Err(err).Msg("failed to get locations for user")
+			respond.Error(w, http.StatusInternalServerError, "failed to filter locations")
+			return
+		}
+		
+		// Create a map for quick lookup
+		locationIDMap := make(map[string]bool)
+		for _, lid := range locationIDs {
+			locationIDMap[lid] = true
+		}
+		
+		// Filter locations
+		filtered := make([]models.Location, 0)
+		for _, location := range items {
+			if locationIDMap[location.ID] {
+				filtered = append(filtered, location)
+			}
+		}
+		items = filtered
+	}
+
 	respond.List(w, http.StatusOK, items, nil)
 }
 
 func (h *Handlers) GetLocation(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.GetUserFromContext(r)
+	if !ok {
+		respond.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 	item, err := h.sv.Locations.Get(r.Context(), id)
 	if err != nil {
 		respond.Error(w, http.StatusNotFound, "location not found")
 		return
 	}
+
+	// Check involvement if not admin
+	if user.Role != "admin" {
+		involved, err := h.sv.Involvement.IsUserInvolvedWithLocation(r.Context(), user.ID, id)
+		if err != nil {
+			respond.Error(w, http.StatusInternalServerError, "failed to check involvement")
+			return
+		}
+		if !involved {
+			respond.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
+	}
+
 	respond.Single(w, http.StatusOK, item)
 }
 

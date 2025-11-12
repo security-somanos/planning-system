@@ -29,7 +29,7 @@ func (r *ParticipantsRepo) List(ctx context.Context, p PageParams, search, role 
 		where = append(where, "EXISTS (SELECT 1 FROM unnest(roles) r WHERE LOWER(r) = $"+itoa(len(args))+")")
 	}
 	q := `
-		SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages
+		SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages, user_id
 		FROM participants
 	`
 	if len(where) > 0 {
@@ -45,7 +45,7 @@ func (r *ParticipantsRepo) List(ctx context.Context, p PageParams, search, role 
 	items := make([]models.Participant, 0) // Initialize as empty slice, not nil
 	for rows.Next() {
 		var m models.Participant
-		if err := rows.Scan(&m.ID, &m.Name, &m.Roles, &m.Email, &m.Phone, &m.Languages); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.Roles, &m.Email, &m.Phone, &m.Languages, &m.UserID); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, m)
@@ -64,13 +64,13 @@ func (r *ParticipantsRepo) List(ctx context.Context, p PageParams, search, role 
 func (r *ParticipantsRepo) Get(ctx context.Context, id string) (models.Participant, error) {
 	var m models.Participant
 	err := scanOne(ctx, r.Pool.QueryRow(ctx, `
-		SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages
+		SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages, user_id
 		FROM participants WHERE id = $1
 	`, id), &m, func() error {
 		return r.Pool.QueryRow(ctx, `
-			SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages
+			SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages, user_id
 			FROM participants WHERE id = $1
-		`, id).Scan(&m.ID, &m.Name, &m.Roles, &m.Email, &m.Phone, &m.Languages)
+		`, id).Scan(&m.ID, &m.Name, &m.Roles, &m.Email, &m.Phone, &m.Languages, &m.UserID)
 	})
 	return m, err
 }
@@ -80,18 +80,18 @@ func (r *ParticipantsRepo) Create(ctx context.Context, in models.Participant) (m
 		in.ID = uuid.NewString()
 	}
 	_, err := r.Pool.Exec(ctx, `
-		INSERT INTO participants (id, name, roles, email, phone, languages)
-		VALUES ($1,$2,$3,$4,$5,$6)
-	`, in.ID, in.Name, in.Roles, in.Email, in.Phone, in.Languages)
+		INSERT INTO participants (id, name, roles, email, phone, languages, user_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
+	`, in.ID, in.Name, in.Roles, in.Email, in.Phone, in.Languages, in.UserID)
 	return in, err
 }
 
 func (r *ParticipantsRepo) Update(ctx context.Context, id string, in models.Participant) (models.Participant, error) {
 	tag, err := r.Pool.Exec(ctx, `
 		UPDATE participants
-		SET name=$2, roles=$3, email=$4, phone=$5, languages=$6
+		SET name=$2, roles=$3, email=$4, phone=$5, languages=$6, user_id=$7
 		WHERE id=$1
-	`, id, in.Name, in.Roles, in.Email, in.Phone, in.Languages)
+	`, id, in.Name, in.Roles, in.Email, in.Phone, in.Languages, in.UserID)
 	if err != nil {
 		return models.Participant{}, err
 	}

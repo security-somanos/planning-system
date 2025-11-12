@@ -9,26 +9,57 @@ type Location struct {
 }
 
 type Vehicle struct {
-	ID                   string  `json:"id"`
-	Label                string  `json:"label"`
-	Make                 string  `json:"make,omitempty"`
-	Model                string  `json:"model,omitempty"`
-	LicensePlate         string  `json:"licensePlate,omitempty"`
-	Capacity             *int    `json:"capacity,omitempty"`
-	Notes                string  `json:"notes,omitempty"`
-	AvailableFrom        *string `json:"availableFrom,omitempty"`
-	AvailableTo          *string `json:"availableTo,omitempty"`
+	ID                    string  `json:"id"`
+	Label                 string  `json:"label"`
+	Make                  string  `json:"make,omitempty"`
+	Model                 string  `json:"model,omitempty"`
+	LicensePlate          string  `json:"licensePlate,omitempty"`
+	Capacity              *int    `json:"capacity,omitempty"`
+	Notes                 string  `json:"notes,omitempty"`
+	AvailableFrom         *string `json:"availableFrom,omitempty"`
+	AvailableTo           *string `json:"availableTo,omitempty"`
 	OriginationLocationID *string `json:"originationLocationId,omitempty"`
 }
 
 type Participant struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Roles           []string `json:"roles"`
-	Email           string   `json:"email,omitempty"`
-	Phone           string   `json:"phone,omitempty"`
-	Languages       []string `json:"languages,omitempty"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	Roles            []string `json:"roles"`
+	Email            string   `json:"email,omitempty"`
+	Phone            string   `json:"phone,omitempty"`
+	Languages        []string `json:"languages,omitempty"`
+	UserID           *string  `json:"userId,omitempty"`
 	AssignedBlockIDs []string `json:"assignedBlockIds,omitempty"` // derived
+}
+
+type User struct {
+	ID           string `json:"id"`
+	Email        string `json:"email"`
+	PasswordHash string `json:"-"`    // Never serialize password hash
+	Role         string `json:"role"` // "admin" | "user"
+	CreatedAt    string `json:"createdAt,omitempty"`
+	UpdatedAt    string `json:"updatedAt,omitempty"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+	User  User   `json:"user"`
+}
+
+type CreateUserRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     string `json:"role"` // "admin" | "user"
+}
+
+type UpdateUserRequest struct {
+	Email string `json:"email,omitempty"`
+	Role  string `json:"role,omitempty"`
 }
 
 type Event struct {
@@ -42,8 +73,8 @@ type Event struct {
 type Day struct {
 	ID        string     `json:"id"`
 	EventID   string     `json:"eventId"`
-	Date      string     `json:"date"` // ISO date (YYYY-MM-DD)
-	Blocks    []Block    `json:"blocks"` // ordered
+	Date      string     `json:"date"`      // ISO date (YYYY-MM-DD)
+	Blocks    []Block    `json:"blocks"`    // ordered
 	Movements []Movement `json:"movements"` // ordered
 }
 
@@ -61,7 +92,7 @@ type AgendaItem struct {
 
 type ScheduleItem struct {
 	ID                string  `json:"id"`
-	BlockID           string  `json:"-"` // internal only
+	BlockID           string  `json:"-"`    // internal only
 	Time              string  `json:"time"` // HH:mm
 	Description       string  `json:"description"`
 	StaffInstructions string  `json:"staffInstructions,omitempty"`
@@ -71,48 +102,46 @@ type ScheduleItem struct {
 
 type Block struct {
 	ID                    string         `json:"id"`
-	DayID                 string         `json:"-"` // internal only
+	DayID                 string         `json:"-"`    // internal only
 	Type                  string         `json:"type"` // "activity" | "break"
 	Title                 string         `json:"title"`
 	Description           string         `json:"description,omitempty"`
-	StartTime             string         `json:"startTime"` // HH:mm
+	StartTime             string         `json:"startTime"`         // HH:mm
 	EndTime               string         `json:"endTime,omitempty"` // HH:mm
 	EndTimeFixed          *bool          `json:"endTimeFixed,omitempty"`
 	LocationID            *string        `json:"locationId,omitempty"`
-	ParticipantsIds       []string        `json:"participantsIds,omitempty"`
-	AdvanceParticipantIDs []string        `json:"advanceParticipantIds,omitempty"`
-	MetByParticipantIDs   []string        `json:"metByParticipantIds,omitempty"`
-	Attachments           []string        `json:"attachments,omitempty"`
-	Notes                 string          `json:"notes,omitempty"`
-	ScheduleItems         []ScheduleItem  `json:"scheduleItems,omitempty"` // ordered by time
+	ParticipantsIds       []string       `json:"participantsIds,omitempty"`
+	AdvanceParticipantIDs []string       `json:"advanceParticipantIds,omitempty"`
+	MetByParticipantIDs   []string       `json:"metByParticipantIds,omitempty"`
+	Attachments           []string       `json:"attachments,omitempty"`
+	Notes                 string         `json:"notes,omitempty"`
+	ScheduleItems         []ScheduleItem `json:"scheduleItems,omitempty"` // ordered by time
 }
 
 type Movement struct {
-	ID                 string             `json:"id"`
-	DayID              string             `json:"-"` // internal only
-	Title              string             `json:"title"`
-	Description        string             `json:"description,omitempty"`
-	FromLocationID     string             `json:"fromLocationId"`
-	ToLocationID       string             `json:"toLocationId"`
-	FromTime           string             `json:"fromTime"` // HH:mm
-	ToTimeType         string             `json:"toTimeType"` // "fixed" | "driving"
-	ToTime             string             `json:"toTime"` // HH:mm if fixed, or total minutes as string if driving
-	DrivingTimeHours   *int               `json:"drivingTimeHours,omitempty"`
-	DrivingTimeMinutes *int               `json:"drivingTimeMinutes,omitempty"`
+	ID                 string              `json:"id"`
+	DayID              string              `json:"-"` // internal only
+	Title              string              `json:"title"`
+	Description        string              `json:"description,omitempty"`
+	FromLocationID     string              `json:"fromLocationId"`
+	ToLocationID       string              `json:"toLocationId"`
+	FromTime           string              `json:"fromTime"`   // HH:mm
+	ToTimeType         string              `json:"toTimeType"` // "fixed" | "driving"
+	ToTime             string              `json:"toTime"`     // HH:mm if fixed, or total minutes as string if driving
+	DrivingTimeHours   *int                `json:"drivingTimeHours,omitempty"`
+	DrivingTimeMinutes *int                `json:"drivingTimeMinutes,omitempty"`
 	VehicleAssignments []VehicleAssignment `json:"vehicleAssignments,omitempty"`
-	Notes              string             `json:"notes,omitempty"`
+	Notes              string              `json:"notes,omitempty"`
 }
 
 type VehicleAssignment struct {
-	ID            string   `json:"-"` // internal only
-	MovementID    string   `json:"-"` // internal only
-	VehicleID     string   `json:"vehicleId"`
-	DriverID      *string  `json:"driverId,omitempty"`
+	ID             string   `json:"-"` // internal only
+	MovementID     string   `json:"-"` // internal only
+	VehicleID      string   `json:"vehicleId"`
+	DriverID       *string  `json:"driverId,omitempty"`
 	ParticipantIDs []string `json:"participantIds,omitempty"`
 }
 
 type CreateDaysRequest struct {
 	Dates []string `json:"dates"` // Array of ISO dates (YYYY-MM-DD)
 }
-
-

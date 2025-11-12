@@ -1,11 +1,11 @@
 'use client';
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 import { Calendar, LogOut, LucideIcon } from "lucide-react";
 import { RequireRole } from "../../components/auth/RequireRole";
 import { Button } from "../ui/Button";
-import { logout } from "../../lib/session";
+import { useAuth } from "@/contexts/AuthContext";
 
 const nav: Array<{ href: string; label: string; icon: LucideIcon }> = [{ href: "/portal", label: "My Agenda", icon: Calendar }];
 
@@ -26,11 +26,7 @@ function NavLink({ href, label, icon: Icon }: { href: string; label: string; ico
 }
 
 export function ParticipantLayout({ children, title }: { children: ReactNode; title?: string }) {
-  const router = useRouter();
-  const onLogout = () => {
-    logout();
-    router.replace("/login");
-  };
+  const { logout } = useAuth();
   return (
     <RequireRole role="participant">
       <div className="flex min-h-screen bg-zinc-50">
@@ -46,7 +42,7 @@ export function ParticipantLayout({ children, title }: { children: ReactNode; ti
               ))}
             </nav>
             <div className="border-t border-zinc-200 p-3">
-              <Button variant="secondary" onClick={onLogout} className="w-full flex items-center justify-center gap-2">
+              <Button variant="secondary" onClick={logout} className="w-full flex items-center justify-center gap-2">
                 <LogOut className="h-4 w-4" />
                 Logout
               </Button>

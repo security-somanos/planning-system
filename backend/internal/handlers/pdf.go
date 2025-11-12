@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"planning-system/backend/internal/auth"
 	"planning-system/backend/internal/models"
 	"planning-system/backend/internal/repos"
 
@@ -16,11 +17,33 @@ import (
 
 // ExportPDF generates a PDF export of the event with days, blocks, movements, participants, locations, and vehicles.
 func (h *Handlers) ExportPDF(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.GetUserFromContext(r)
+	if !ok {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
 	// Fetch data
 	days, err := h.sv.Days.List(r.Context())
 	if err != nil {
 		http.Error(w, `{"error":"failed to load days"}`, http.StatusInternalServerError)
 		return
+	}
+
+	// Filter by involvement if not admin
+	if user.Role != "admin" {
+		filtered := make([]models.Day, 0)
+		for _, day := range days {
+			involved, err := h.sv.Involvement.IsUserInvolvedInDay(r.Context(), user.ID, day.ID)
+			if err != nil {
+				h.log.Error().Err(err).Msg("failed to check involvement")
+				continue
+			}
+			if involved {
+				filtered = append(filtered, day)
+			}
+		}
+		days = filtered
 	}
 	// Participants (fetch many)
 	participants, _, err := h.sv.Participants.List(r.Context(), repos.PageParams{Limit: 10000, Offset: 0}, "", "")
@@ -315,6 +338,367 @@ func (h *Handlers) ExportPDF(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", `inline; filename="itinerary.pdf"`)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(buf.Bytes())
+}
+
+// ExportMyItineraryPDF generates a PDF export for regular users with their name on the cover
+// and only shows data where they're involved, with filtered vehicle assignments
+func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.GetUserFromContext(r)
+	if !ok {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// Get user's participant to get their name
+	participantID, err := h.sv.Involvement.GetParticipantIDByUserID(r.Context(), user.ID)
+	var userName string = "My Itinerary"
+	if err == nil && participantID != "" {
+		participant, err := h.sv.Participants.Get(r.Context(), participantID)
+		if err == nil {
+			userName = participant.Name
+		}
+	}
+
+	// Fetch data - already filtered by involvement in ListDays
+	days, err := h.sv.Days.List(r.Context())
+	if err != nil {
+		http.Error(w, `{"error":"failed to load days"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Filter by involvement (always filter for this endpoint)
+	filtered := make([]models.Day, 0)
+	for _, day := range days {
+		involved, err := h.sv.Involvement.IsUserInvolvedInDay(r.Context(), user.ID, day.ID)
+		if err != nil {
+			h.log.Error().Err(err).Msg("failed to check involvement")
+			continue
+		}
+		if involved {
+			filtered = append(filtered, day)
+		}
+	}
+	days = filtered
+
+	// Filter vehicle assignments for each movement in each day
+	for i := range days {
+		for j := range days[i].Movements {
+			filteredAssignments := make([]models.VehicleAssignment, 0)
+			for _, assignment := range days[i].Movements[j].VehicleAssignments {
+				// Include if user's participant is the driver
+				if assignment.DriverID != nil && *assignment.DriverID == participantID {
+					filteredAssignments = append(filteredAssignments, assignment)
+					continue
+				}
+				// Include if user's participant is in the passenger list
+				for _, pid := range assignment.ParticipantIDs {
+					if pid == participantID {
+						filteredAssignments = append(filteredAssignments, assignment)
+						break
+					}
+				}
+			}
+			days[i].Movements[j].VehicleAssignments = filteredAssignments
+		}
+	}
+
+	// Get participants (all - needed for lookups in blocks/movements)
+	participants, _, err := h.sv.Participants.List(r.Context(), repos.PageParams{Limit: 10000, Offset: 0}, "", "")
+	if err != nil {
+		http.Error(w, `{"error":"failed to load participants"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Get locations and vehicles - filter by involvement for regular users
+	allLocations, err := h.sv.Locations.List(r.Context())
+	if err != nil {
+		http.Error(w, `{"error":"failed to load locations"}`, http.StatusInternalServerError)
+		return
+	}
+	allVehicles, err := h.sv.Vehicles.List(r.Context())
+	if err != nil {
+		http.Error(w, `{"error":"failed to load vehicles"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Filter locations and vehicles by involvement
+	var locations []models.Location
+	var vehicles []models.Vehicle
+	if user.Role == "admin" {
+		locations = allLocations
+		vehicles = allVehicles
+	} else {
+		// Filter locations
+		locationIDs, err := h.sv.Involvement.GetLocationsForUser(r.Context(), user.ID)
+		if err == nil {
+			locationIDMap := make(map[string]bool)
+			for _, lid := range locationIDs {
+				locationIDMap[lid] = true
+			}
+			for _, loc := range allLocations {
+				if locationIDMap[loc.ID] {
+					locations = append(locations, loc)
+				}
+			}
+		}
+
+		// Filter vehicles
+		vehicleIDs, err := h.sv.Involvement.GetVehiclesForUser(r.Context(), user.ID)
+		if err == nil {
+			vehicleIDMap := make(map[string]bool)
+			for _, vid := range vehicleIDs {
+				vehicleIDMap[vid] = true
+			}
+			for _, veh := range allVehicles {
+				if vehicleIDMap[veh.ID] {
+					vehicles = append(vehicles, veh)
+				}
+			}
+		}
+	}
+
+	// Build lookups
+	locByID := map[string]models.Location{}
+	for _, l := range locations {
+		locByID[l.ID] = l
+	}
+	partByID := map[string]models.Participant{}
+	for _, p := range participants {
+		partByID[p.ID] = p
+	}
+	vehByID := map[string]models.Vehicle{}
+	for _, v := range vehicles {
+		vehByID[v.ID] = v
+	}
+
+	pdf := gofpdf.New("L", "mm", "A4", "") // Landscape orientation
+
+	// Register Times New Roman fonts
+	pdf.AddUTF8Font("Times", "", filepath.Join("assets", "fonts", "times.ttf"))
+	pdf.AddUTF8Font("Times", "B", filepath.Join("assets", "fonts", "timesbd.ttf"))
+	pdf.AddUTF8Font("Times", "I", filepath.Join("assets", "fonts", "timesi.ttf"))
+	pdf.AddUTF8Font("Times", "BI", filepath.Join("assets", "fonts", "timesbi.ttf"))
+
+	// Header configuration - shared between header callback and date positioning
+	headerStartY := 6.0
+	logoHeight := 18.0
+	headerBottomY := headerStartY + logoHeight + 4.0
+	headerContentPadding := 8.0
+	headerTotalHeight := headerBottomY + headerContentPadding
+
+	// Set top margin to account for header height
+	pdf.SetMargins(12, headerTotalHeight, 12)
+	pdf.SetAutoPageBreak(true, 12)
+
+	// Header callbacks support
+	logoPath := filepath.Join("assets", "logo.png")
+	pdf.RegisterImageOptions(logoPath, gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true})
+
+	// Track current day's date for header callback
+	var currentDayDate string
+	var isCoverPage bool = true
+
+	headerCallbacks := []func(*gofpdf.Fpdf){
+		func(p *gofpdf.Fpdf) {
+			// Skip header on cover page
+			if isCoverPage {
+				return
+			}
+
+			// Default header: logo on the right and a subtle bottom border
+			pageW := 297.0
+			rightMargin := 12.0
+			y := headerStartY
+			logoH := logoHeight
+
+			// Calculate logo width to position it on the right
+			logoWidth := 0.0
+			if info := p.GetImageInfo(logoPath); info != nil {
+				imgWidth := info.Width()
+				imgHeight := info.Height()
+				if imgHeight > 0 {
+					aspectRatio := imgWidth / imgHeight
+					logoWidth = logoH * aspectRatio
+				}
+			}
+
+			// Position logo on the right
+			x := pageW - rightMargin - logoWidth
+
+			if info := p.GetImageInfo(logoPath); info != nil {
+				p.ImageOptions(logoPath, x, y, 0, logoH, false, gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}, 0, "")
+			} else {
+				p.ImageOptions(logoPath, x, y, 0, logoH, false, gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}, 0, "")
+			}
+
+			// Draw date if available
+			if currentDayDate != "" {
+				dateStr := formatDateHeader(currentDayDate)
+				dateY := headerStartY + logoHeight - 4.0
+				p.SetY(dateY)
+				p.SetFont("Times", "B", 14)
+				p.CellFormat(0, 10, dateStr, "", 0, "L", false, 0, "")
+			}
+
+			// Subtle bottom border
+			bottomY := headerBottomY
+			leftMargin := 12.0
+			p.SetDrawColor(200, 200, 200)
+			p.SetLineWidth(0.35)
+			p.Line(leftMargin, bottomY, pageW-rightMargin, bottomY)
+			p.SetY(bottomY + headerContentPadding)
+		},
+	}
+	pdf.SetHeaderFuncMode(func() {
+		for _, cb := range headerCallbacks {
+			cb(pdf)
+		}
+	}, true)
+
+	// Cover page with user's name
+	isCoverPage = true
+	pdf.AddPage()
+
+	// Add banner image
+	bannerPath := filepath.Join("assets", "banner.png")
+	options := gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}
+	pdf.RegisterImageOptions(bannerPath, options)
+
+	pageWidth := 297.0 - 24.0
+	pageHeight := 210.0 - 24.0
+	bannerHeight := pageHeight * 0.5
+
+	imgInfo := pdf.GetImageInfo(bannerPath)
+	var bannerX float64 = 0
+
+	if imgInfo != nil {
+		imgWidth := imgInfo.Width()
+		imgHeight := imgInfo.Height()
+		aspectRatio := imgWidth / imgHeight
+		bannerWidth := bannerHeight * aspectRatio
+		bannerX = 12 + (pageWidth-bannerWidth)/2
+	}
+
+	pdf.ImageOptions(bannerPath, bannerX, 12, 0, bannerHeight, false, options, 0, "")
+
+	// Position title below banner with user's name, centered
+	pdf.SetY(12 + bannerHeight + 20)
+	pdf.SetFont("Times", "B", 18)
+	pdf.CellFormat(0, 10, strings.ToUpper(userName), "", 0, "C", false, 0, "")
+
+	// Section: Days - all pages are landscape
+	for _, d := range days {
+		// Skip days with no blocks and no movements
+		if len(d.Blocks) == 0 && len(d.Movements) == 0 {
+			continue
+		}
+
+		currentDayDate = d.Date
+		isCoverPage = false
+		pdf.AddPage()
+
+		checkAndAddPageIfNeeded := func(requiredHeight float64) {
+			pageHeight := 210.0
+			topMargin := headerTotalHeight
+			bottomMargin := 12.0
+			availableHeight := pageHeight - topMargin - bottomMargin
+			minRequiredSpace := availableHeight * 0.4
+
+			currentY := pdf.GetY()
+			remainingSpace := pageHeight - bottomMargin - currentY
+
+			if remainingSpace < minRequiredSpace || remainingSpace < requiredHeight {
+				pdf.AddPage()
+			}
+		}
+
+		// Blocks (Activities)
+		if len(d.Blocks) > 0 {
+			for _, b := range d.Blocks {
+				estimatedDescHeight := 80.0
+				checkAndAddPageIfNeeded(estimatedDescHeight)
+
+				drawEventDescriptionTables(pdf, b, locByID, partByID)
+
+				if b.Notes != "" {
+					estimatedNotesHeight := 60.0
+					pageHeight := 210.0
+					topMargin := headerTotalHeight
+					bottomMargin := 12.0
+					availableHeight := pageHeight - topMargin - bottomMargin
+					minRequiredSpace := availableHeight * 0.4
+					currentY := pdf.GetY()
+					remainingSpace := pageHeight - bottomMargin - currentY
+
+					if remainingSpace < minRequiredSpace || remainingSpace < estimatedNotesHeight {
+						pdf.AddPage()
+					}
+				}
+
+				pdf.Ln(5)
+
+				if len(b.ScheduleItems) > 0 {
+					estimatedLineByLineHeight := float64(len(b.ScheduleItems)+1) * 10.0
+					checkAndAddPageIfNeeded(estimatedLineByLineHeight)
+					drawLineByLineTable(pdf, b)
+					pdf.Ln(5)
+				}
+			}
+		}
+
+		// Movements
+		if len(d.Movements) > 0 {
+			for _, m := range d.Movements {
+				estimatedMovementHeight := 80.0
+				checkAndAddPageIfNeeded(estimatedMovementHeight)
+
+				drawMovementDescriptionTables(pdf, m, locByID)
+
+				if m.Notes != "" {
+					estimatedNotesHeight := 60.0
+					pageHeight := 210.0
+					topMargin := headerTotalHeight
+					bottomMargin := 12.0
+					availableHeight := pageHeight - topMargin - bottomMargin
+					minRequiredSpace := availableHeight * 0.4
+					currentY := pdf.GetY()
+					remainingSpace := pageHeight - bottomMargin - currentY
+
+					if remainingSpace < minRequiredSpace || remainingSpace < estimatedNotesHeight {
+						pdf.AddPage()
+					}
+				}
+
+				pdf.Ln(5)
+
+				if len(m.VehicleAssignments) > 0 {
+					estimatedVehicleHeight := float64(len(m.VehicleAssignments)+1) * 15.0
+					checkAndAddPageIfNeeded(estimatedVehicleHeight)
+					drawVehicleAssignmentsTable(pdf, m, vehByID, partByID)
+					pdf.Ln(5)
+				}
+			}
+		}
+
+		// End of day
+		pdf.Ln(10)
+		pdf.SetFont("Times", "B", 14)
+		endDayText := formatEndDayText(d.Date)
+		pdf.CellFormat(0, 10, endDayText, "", 0, "C", false, 0, "")
+		pdf.Ln(10)
+		pdf.AddPage()
+	}
+
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		http.Error(w, `{"error":"failed to generate pdf"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", `inline; filename="my-itinerary.pdf"`)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(buf.Bytes())
 }
