@@ -32,9 +32,10 @@ export function setAuth(token: string, user: User): void {
   writeToStorage(TOKEN_KEY, token);
   writeToStorage(USER_KEY, user);
   
-  // Also set cookie for server-side API routes
+  // Also set in cookies for server-side API routes
   if (isBrowser()) {
-    document.cookie = `ps:auth:token=${token}; path=/; max-age=${24 * 60 * 60}; SameSite=Lax`;
+    document.cookie = `${TOKEN_KEY}=${token}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
+    document.cookie = `${USER_KEY}=${JSON.stringify(user)}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
   }
 }
 
@@ -42,9 +43,10 @@ export function clearAuth(): void {
   removeFromStorage(TOKEN_KEY);
   removeFromStorage(USER_KEY);
   
-  // Also clear cookie
+  // Also clear cookies
   if (isBrowser()) {
-    document.cookie = 'ps:auth:token=; path=/; max-age=0';
+    document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
+    document.cookie = `${USER_KEY}=; path=/; max-age=0`;
   }
 }
 

@@ -139,8 +139,8 @@ func (h *Handlers) CreateTestUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create test admin user
-	testEmail := "nick@bapple.com"
-	testPassword := "R1Os3K5t7zVoo50IqmSCR1Os3K5t7zVoo50IqmSC"
+	testEmail := "admin@test.com"
+	testPassword := "admin123"
 	testRole := "admin"
 
 	// Hash password

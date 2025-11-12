@@ -342,9 +342,9 @@ func (h *Handlers) ExportPDF(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(buf.Bytes())
 }
 
-// ExportMyItineraryPDF generates a PDF export for regular users with their name on the cover
-// and only shows data where they're involved, with filtered vehicle assignments
-func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) {
+// ExportUserPDF generates a PDF export for regular users with their name on the cover
+// and only includes data where the user is involved
+func (h *Handlers) ExportUserPDF(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.GetUserFromContext(r)
 	if !ok {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
@@ -353,22 +353,26 @@ func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) 
 
 	// Get user's participant to get their name
 	participantID, err := h.sv.Involvement.GetParticipantIDByUserID(r.Context(), user.ID)
-	var userName string = "My Itinerary"
+	var userName string
 	if err == nil && participantID != "" {
 		participant, err := h.sv.Participants.Get(r.Context(), participantID)
 		if err == nil {
 			userName = participant.Name
 		}
 	}
+	// Fallback to email if no participant name
+	if userName == "" {
+		userName = user.Email
+	}
 
-	// Fetch data - already filtered by involvement in ListDays
+	// Fetch data - only days where user is involved
 	days, err := h.sv.Days.List(r.Context())
 	if err != nil {
 		http.Error(w, `{"error":"failed to load days"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Filter by involvement (always filter for this endpoint)
+	// Filter by involvement (always filter for user PDF)
 	filtered := make([]models.Day, 0)
 	for _, day := range days {
 		involved, err := h.sv.Involvement.IsUserInvolvedInDay(r.Context(), user.ID, day.ID)
@@ -382,80 +386,120 @@ func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) 
 	}
 	days = filtered
 
-	// Filter vehicle assignments for each movement in each day
-	for i := range days {
-		for j := range days[i].Movements {
-			filteredAssignments := make([]models.VehicleAssignment, 0)
-			for _, assignment := range days[i].Movements[j].VehicleAssignments {
-				// Include if user's participant is the driver
-				if assignment.DriverID != nil && *assignment.DriverID == participantID {
-					filteredAssignments = append(filteredAssignments, assignment)
-					continue
-				}
-				// Include if user's participant is in the passenger list
-				for _, pid := range assignment.ParticipantIDs {
-					if pid == participantID {
-						filteredAssignments = append(filteredAssignments, assignment)
-						break
-					}
-				}
-			}
-			days[i].Movements[j].VehicleAssignments = filteredAssignments
-		}
-	}
-
-	// Get participants (all - needed for lookups in blocks/movements)
-	participants, _, err := h.sv.Participants.List(r.Context(), repos.PageParams{Limit: 10000, Offset: 0}, "", "")
+	// Get only participants, locations, and vehicles where user is involved
+	// First get all participants to find which ones are involved
+	allParticipants, _, err := h.sv.Participants.List(r.Context(), repos.PageParams{Limit: 10000, Offset: 0}, "", "")
 	if err != nil {
 		http.Error(w, `{"error":"failed to load participants"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Get locations and vehicles - filter by involvement for regular users
+	// Get user's participant ID if available
+	if participantID == "" {
+		participantID, _ = h.sv.Involvement.GetParticipantIDByUserID(r.Context(), user.ID)
+	}
+
+	// Filter participants - only those involved in the same days/blocks/movements
+	participantIDs := make(map[string]bool)
+	for _, day := range days {
+		for _, block := range day.Blocks {
+			for _, pid := range block.ParticipantsIds {
+				participantIDs[pid] = true
+			}
+			for _, pid := range block.AdvanceParticipantIDs {
+				participantIDs[pid] = true
+			}
+			for _, pid := range block.MetByParticipantIDs {
+				participantIDs[pid] = true
+			}
+		}
+		for i := range day.Movements {
+			movement := &day.Movements[i]
+			// Filter vehicle assignments first
+			filteredAssignments := make([]models.VehicleAssignment, 0)
+			for _, assignment := range movement.VehicleAssignments {
+				if participantID != "" {
+					// Include if user's participant is the driver
+					if assignment.DriverID != nil && *assignment.DriverID == participantID {
+						filteredAssignments = append(filteredAssignments, assignment)
+						// Add driver and passengers
+						if assignment.DriverID != nil {
+							participantIDs[*assignment.DriverID] = true
+						}
+						for _, pid := range assignment.ParticipantIDs {
+							participantIDs[pid] = true
+						}
+						continue
+					}
+					// Include if user's participant is in the passenger list
+					for _, pid := range assignment.ParticipantIDs {
+						if pid == participantID {
+							filteredAssignments = append(filteredAssignments, assignment)
+							// Add driver and all passengers
+							if assignment.DriverID != nil {
+								participantIDs[*assignment.DriverID] = true
+							}
+							for _, pid2 := range assignment.ParticipantIDs {
+								participantIDs[pid2] = true
+							}
+							break
+						}
+					}
+				}
+			}
+			movement.VehicleAssignments = filteredAssignments
+		}
+	}
+
+	// Filter participants to only those involved
+	participants := make([]models.Participant, 0)
+	for _, p := range allParticipants {
+		if participantIDs[p.ID] {
+			participants = append(participants, p)
+		}
+	}
+
+	// Get locations where user is involved
+	locationIDs, err := h.sv.Involvement.GetLocationsForUser(r.Context(), user.ID)
+	if err != nil {
+		h.log.Error().Err(err).Msg("failed to get locations for user")
+		locationIDs = []string{}
+	}
 	allLocations, err := h.sv.Locations.List(r.Context())
 	if err != nil {
 		http.Error(w, `{"error":"failed to load locations"}`, http.StatusInternalServerError)
 		return
+	}
+	locationIDMap := make(map[string]bool)
+	for _, lid := range locationIDs {
+		locationIDMap[lid] = true
+	}
+	locations := make([]models.Location, 0)
+	for _, loc := range allLocations {
+		if locationIDMap[loc.ID] {
+			locations = append(locations, loc)
+		}
+	}
+
+	// Get vehicles where user is involved
+	vehicleIDs, err := h.sv.Involvement.GetVehiclesForUser(r.Context(), user.ID)
+	if err != nil {
+		h.log.Error().Err(err).Msg("failed to get vehicles for user")
+		vehicleIDs = []string{}
 	}
 	allVehicles, err := h.sv.Vehicles.List(r.Context())
 	if err != nil {
 		http.Error(w, `{"error":"failed to load vehicles"}`, http.StatusInternalServerError)
 		return
 	}
-
-	// Filter locations and vehicles by involvement
-	var locations []models.Location
-	var vehicles []models.Vehicle
-	if user.Role == "admin" {
-		locations = allLocations
-		vehicles = allVehicles
-	} else {
-		// Filter locations
-		locationIDs, err := h.sv.Involvement.GetLocationsForUser(r.Context(), user.ID)
-		if err == nil {
-			locationIDMap := make(map[string]bool)
-			for _, lid := range locationIDs {
-				locationIDMap[lid] = true
-			}
-			for _, loc := range allLocations {
-				if locationIDMap[loc.ID] {
-					locations = append(locations, loc)
-				}
-			}
-		}
-
-		// Filter vehicles
-		vehicleIDs, err := h.sv.Involvement.GetVehiclesForUser(r.Context(), user.ID)
-		if err == nil {
-			vehicleIDMap := make(map[string]bool)
-			for _, vid := range vehicleIDs {
-				vehicleIDMap[vid] = true
-			}
-			for _, veh := range allVehicles {
-				if vehicleIDMap[veh.ID] {
-					vehicles = append(vehicles, veh)
-				}
-			}
+	vehicleIDMap := make(map[string]bool)
+	for _, vid := range vehicleIDs {
+		vehicleIDMap[vid] = true
+	}
+	vehicles := make([]models.Vehicle, 0)
+	for _, veh := range allVehicles {
+		if vehicleIDMap[veh.ID] {
+			vehicles = append(vehicles, veh)
 		}
 	}
 
@@ -583,7 +627,7 @@ func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) 
 
 	pdf.ImageOptions(bannerPath, bannerX, 12, 0, bannerHeight, false, options, 0, "")
 
-	// Position title below banner with user's name, centered
+	// Position title below banner, centered - show user's name
 	pdf.SetY(12 + bannerHeight + 20)
 	pdf.SetFont("Times", "B", 18)
 	pdf.CellFormat(0, 10, strings.ToUpper(userName), "", 0, "C", false, 0, "")
@@ -595,8 +639,11 @@ func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) 
 			continue
 		}
 
+		// Set current day's date for header callback
 		currentDayDate = d.Date
 		isCoverPage = false
+
+		// Add new page for each day
 		pdf.AddPage()
 
 		checkAndAddPageIfNeeded := func(requiredHeight float64) {
@@ -639,6 +686,7 @@ func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) 
 
 				pdf.Ln(5)
 
+				// Line by line section
 				if len(b.ScheduleItems) > 0 {
 					estimatedLineByLineHeight := float64(len(b.ScheduleItems)+1) * 10.0
 					checkAndAddPageIfNeeded(estimatedLineByLineHeight)
@@ -673,6 +721,7 @@ func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) 
 
 				pdf.Ln(5)
 
+				// Vehicle assignments table (already filtered above)
 				if len(m.VehicleAssignments) > 0 {
 					estimatedVehicleHeight := float64(len(m.VehicleAssignments)+1) * 15.0
 					checkAndAddPageIfNeeded(estimatedVehicleHeight)
@@ -688,6 +737,8 @@ func (h *Handlers) ExportMyItineraryPDF(w http.ResponseWriter, r *http.Request) 
 		endDayText := formatEndDayText(d.Date)
 		pdf.CellFormat(0, 10, endDayText, "", 0, "C", false, 0, "")
 		pdf.Ln(10)
+
+		// Always add a new page after END DAY
 		pdf.AddPage()
 	}
 

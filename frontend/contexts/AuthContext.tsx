@@ -30,9 +30,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(storedUser);
-      // Ensure cookie is set (in case it was cleared)
+      
+      // Also set in cookies for server-side API routes (if not already set)
       if (typeof window !== 'undefined') {
-        document.cookie = `ps:auth:token=${storedToken}; path=/; max-age=${24 * 60 * 60}; SameSite=Lax`;
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('ps:auth:token='));
+        if (!tokenCookie) {
+          document.cookie = `ps:auth:token=${storedToken}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
+          document.cookie = `ps:auth:user=${JSON.stringify(storedUser)}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
+        }
       }
     }
     

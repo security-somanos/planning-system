@@ -161,10 +161,13 @@ func NewRouter(cfg config.Config, logger zerolog.Logger, pool *pgxpool.Pool) htt
 		r.Get("/itinerary", h.Itinerary)
 		r.Get("/agenda/{participantId}", h.Agenda)
 
-		// PDF export - users can only export data they're involved in
-		r.Get("/export/pdf", h.ExportPDF)
-		// User-specific PDF export with their name on cover
-		r.Get("/export/pdf/my-itinerary", h.ExportMyItineraryPDF)
+		// PDF export - admin export (all data)
+		r.Group(func(r chi.Router) {
+			r.Use(RequireAdmin)
+			r.Get("/export/pdf", h.ExportPDF)
+		})
+		// PDF export - user export (filtered data with user's name on cover)
+		r.Get("/export/user-pdf", h.ExportUserPDF)
 	})
 
 	return r

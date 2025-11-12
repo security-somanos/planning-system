@@ -2,12 +2,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
-import { Calendar, LogOut, LucideIcon } from "lucide-react";
+import { Calendar, FileText, LogOut, LucideIcon } from "lucide-react";
 import { RequireRole } from "../../components/auth/RequireRole";
 import { Button } from "../ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 
-const nav: Array<{ href: string; label: string; icon: LucideIcon }> = [{ href: "/portal", label: "My Agenda", icon: Calendar }];
+const nav: Array<{ href: string; label: string; icon: LucideIcon }> = [
+  { href: "/portal", label: "My Agenda", icon: Calendar },
+  { href: "/portal/itinerary", label: "Itinerary", icon: FileText },
+];
 
 function NavLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
   const pathname = usePathname();
