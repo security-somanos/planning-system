@@ -24,7 +24,7 @@ func Load() Config {
 	cfg := Config{
 		Env:         getEnv("ENV", "dev"),
 		Port:        getEnv("PORT", "8080"),
-		DatabaseURL: getEnv("DATABASE_URL", ""),
+		DatabaseURL: getEnv("DATABASE_URL", "postgres://planning:planning123@localhost:5423/planning_system?sslmode=disable"),
 		LogLevel:    strings.ToLower(getEnv("LOG_LEVEL", "info")),
 		AutoMigrate: getEnv("AUTO_MIGRATE", "true") == "true",
 		AutoSeed:    getEnv("AUTO_SEED", "true") == "true",
