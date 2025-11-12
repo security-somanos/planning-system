@@ -15,11 +15,28 @@ export function Button({ variant = "primary", size = "md", className = "", ...re
   }[size];
   const variants = {
     primary: "bg-black text-white hover:bg-zinc-800",
-    secondary: "border border-zinc-300 hover:bg-zinc-100",
+    secondary: "border border-solid text-[#bba26a] hover:opacity-80",
     ghost: "hover:bg-zinc-100",
-    danger: "bg-red-600 text-white hover:bg-red-700",
+    danger: "border border-solid text-[#920712] hover:opacity-80",
   }[variant];
-  return <button className={`${base} ${sizes} ${variants} ${className}`} {...rest} />;
+  
+  // Get background and border colors for danger and secondary variants
+  const style = variant === "danger" 
+    ? { 
+        backgroundColor: "rgba(146, 7, 18, 0.08)", 
+        borderColor: "#920712",
+        borderWidth: "1px",
+        borderStyle: "solid"
+      }
+    : variant === "secondary"
+    ? { 
+        backgroundColor: "rgba(187, 162, 106, 0.08)", 
+        borderColor: "#bba26a",
+        borderWidth: "1px",
+        borderStyle: "solid"
+      }
+    : {};
+  return <button className={`${base} ${sizes} ${variants} ${className}`} style={style} {...rest} />;
 }
 
 

@@ -109,7 +109,7 @@ export default function ParticipantPortalPage() {
                     <div className="flex items-center gap-4 text-sm text-zinc-600">
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-zinc-400"></span>
-                        {d.blocks?.length ?? 0} {(d.blocks?.length ?? 0) === 1 ? "block" : "blocks"}
+                        {d.blocks?.length ?? 0} {(d.blocks?.length ?? 0) === 1 ? "event" : "events"}
                       </span>
                       {(d.blocks?.length ?? 0) > 0 && (
                         <span className="flex items-center gap-1">

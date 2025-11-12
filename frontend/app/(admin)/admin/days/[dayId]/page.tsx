@@ -88,7 +88,7 @@ export default function DayEditorPage() {
   }, [vehicles]);
 
   const deleteBlock = async (id: string) => {
-    if (!confirm("Delete this block?")) return;
+    if (!confirm("Delete this event?")) return;
     await mockApi.delete(`/days/${dayId}/blocks/${id}`);
     const updated = await mockApi.get<{ item: Day }>(`/days/${dayId}`);
     setDay(updated.item);
@@ -157,7 +157,7 @@ export default function DayEditorPage() {
                 <Button variant="secondary">Add movement</Button>
               </Link>
               <Link href={`/admin/days/${dayId}/blocks/new`}>
-                <Button>Add block</Button>
+                <Button>Add event</Button>
               </Link>
             </div>
           </div>

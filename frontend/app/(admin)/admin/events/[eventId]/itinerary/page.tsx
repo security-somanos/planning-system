@@ -124,7 +124,7 @@ export default function ItineraryPage() {
                           {b.startTime}–{b.endTime}
                         </div>
                       </div>
-                    )) ?? <div className="text-sm text-zinc-500">No blocks</div>}
+                    )) ?? <div className="text-sm text-zinc-500">No events</div>}
                   </div>
                 </div>
               ))}

@@ -125,7 +125,7 @@ export default function AdminDashboardPage() {
   };
 
   const deleteDay = async (dayId: string, date: string) => {
-    if (!confirm(`Delete day ${date}? This will remove all blocks for this day.`)) return;
+    if (!confirm(`Delete day ${date}? This will remove all events for this day.`)) return;
     await mockApi.delete(`/days/${dayId}`);
     setDays((prev) => prev.filter((d) => d.id !== dayId));
   };
@@ -175,7 +175,7 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center gap-4 text-sm text-zinc-600">
                           <span className="flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-zinc-400"></span>
-                            {d.blocks?.length ?? 0} {(d.blocks?.length ?? 0) === 1 ? "block" : "blocks"}
+                            {d.blocks?.length ?? 0} {(d.blocks?.length ?? 0) === 1 ? "event" : "events"}
                           </span>
                           {(d.blocks?.length ?? 0) > 0 && (
                             <span className="flex items-center gap-1">

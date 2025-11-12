@@ -112,7 +112,7 @@ export default function ParticipantManagerPage() {
     refresh();
   };
   const remove = async (p: Participant) => {
-    if (!confirm("Delete this participant? They will be removed from blocks.")) return;
+    if (!confirm("Delete this participant? They will be removed from events.")) return;
     await mockApi.delete(`/participants/${p.id}`);
     refresh();
   };

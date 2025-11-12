@@ -50,7 +50,7 @@ export default function LocationManagerPage() {
     refresh();
   };
   const remove = async (l: Location) => {
-    if (!confirm("Delete this location? It will be unlinked from blocks.")) return;
+    if (!confirm("Delete this location? It will be unlinked from events.")) return;
     await mockApi.delete(`/locations/${l.id}`);
     refresh();
   };

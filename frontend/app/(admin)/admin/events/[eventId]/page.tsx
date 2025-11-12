@@ -165,7 +165,7 @@ export default function EventViewPage() {
                     className="rounded-lg border border-zinc-200 bg-white p-4 hover:shadow-sm"
                   >
                     <div className="font-medium">{d.date}</div>
-                    <div className="text-xs text-zinc-600">{d.blocks?.length ?? 0} blocks</div>
+                    <div className="text-xs text-zinc-600">{d.blocks?.length ?? 0} events</div>
                   </Link>
                 ))}
               </div>
@@ -183,7 +183,7 @@ export default function EventViewPage() {
                     <div key={p.id} className="rounded-lg border border-zinc-200 bg-white p-4">
                       <div className="font-medium">{p.name}</div>
                       <div className="text-xs text-zinc-600">
-                        {(Array.isArray((p as any).roles) && (p as any).roles.length ? (p as any).roles.join(", ") : "—")} • {p.count} blocks
+                        {(Array.isArray((p as any).roles) && (p as any).roles.length ? (p as any).roles.join(", ") : "—")} • {p.count} events
                       </div>
                     </div>
                   ))}
@@ -247,7 +247,7 @@ export default function EventViewPage() {
                             {b.startTime}–{b.endTime}
                           </div>
                         </div>
-                      )) ?? <div className="text-sm text-zinc-500">No blocks</div>}
+                      )) ?? <div className="text-sm text-zinc-500">No events</div>}
                     </div>
                   </div>
                 ))}

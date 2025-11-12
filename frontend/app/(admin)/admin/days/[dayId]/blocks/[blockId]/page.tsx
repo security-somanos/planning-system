@@ -134,7 +134,7 @@ export default function BlockEditorPage() {
             });
             setAttachments(mapped);
           } else {
-            setError("Block not found.");
+            setError("Event not found.");
           }
         }
       })
@@ -221,7 +221,7 @@ export default function BlockEditorPage() {
       }
       router.push(`/admin/days/${dayId}`);
     } catch (err) {
-      setError("Failed to save block.");
+      setError("Failed to save event.");
     } finally {
       setSaving(false);
     }
@@ -229,7 +229,7 @@ export default function BlockEditorPage() {
 
   if (loading) {
     return (
-      <AdminLayout title={isNew ? "New Block" : "Edit Block"}>
+      <AdminLayout title={isNew ? "New Event" : "Edit Event"}>
         <div className="text-sm text-zinc-600">Loading…</div>
       </AdminLayout>
     );
@@ -247,7 +247,7 @@ export default function BlockEditorPage() {
   }
 
   return (
-    <AdminLayout title={isNew ? "New Block" : `Edit Block: ${block?.title ?? ""}`}>
+    <AdminLayout title={isNew ? "New Event" : `Edit Event: ${block?.title ?? ""}`}>
       <div className="mb-4">
         <Link href={`/admin/days/${dayId}`}>
           <Button variant="secondary">← Back to Day</Button>
@@ -255,7 +255,16 @@ export default function BlockEditorPage() {
       </div>
 
       <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
+        {/* Event Information Card */}
+        <div className="rounded-lg border border-zinc-200 bg-white p-6">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <div className="mb-1 text-sm font-medium">Type</div>
             <Select
@@ -623,10 +632,24 @@ export default function BlockEditorPage() {
           </div>
         </div>
 
-        <div>
-          <div className="mb-1 text-sm font-medium">Schedule Items</div>
-          <div className="space-y-3">
-            {form.scheduleItems.map((item, idx) => (
+            <div>
+              <div className="mb-1 text-sm font-medium">Notes</div>
+              <Input
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Schedule Items Card */}
+        <div className="rounded-lg border border-zinc-200 bg-white p-6">
+          <div className="space-y-6">
+            <div>
+              <div className="mb-4 text-sm font-medium">Schedule Items</div>
+              <div className="space-y-3">
+                {form.scheduleItems.map((item, idx) => (
               <div key={item.id} className="rounded-lg border border-zinc-200 p-3 bg-zinc-50">
                 <div className="flex items-start gap-2 mb-3">
                   <div className="flex-1 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -679,7 +702,7 @@ export default function BlockEditorPage() {
                   <div>
                     <div className="mb-1 text-xs font-medium text-zinc-700">Staff Instructions</div>
                     <textarea
-                      className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+                      className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs"
                       rows={2}
                       value={item.staffInstructions ?? ""}
                       onChange={(e) => {
@@ -694,7 +717,7 @@ export default function BlockEditorPage() {
                   <div>
                     <div className="mb-1 text-xs font-medium text-zinc-700">Guest Instructions</div>
                     <textarea
-                      className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+                      className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs"
                       rows={2}
                       value={item.guestInstructions ?? ""}
                       onChange={(e) => {
@@ -710,7 +733,7 @@ export default function BlockEditorPage() {
                 <div className="mt-2">
                   <div className="mb-1 text-xs font-medium text-zinc-700">Notes</div>
                   <textarea
-                    className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+                    className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs bg-white"
                     rows={2}
                     value={item.notes ?? ""}
                     onChange={(e) => {
@@ -724,41 +747,36 @@ export default function BlockEditorPage() {
                 </div>
               </div>
             ))}
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setForm((f) => {
-                  const newItem = { id: generateId(), time: "12:00", description: "", staffInstructions: undefined, guestInstructions: undefined, notes: undefined };
-                  const updatedItems = [...f.scheduleItems, newItem];
-                  return {
-                    ...f,
-                    scheduleItems: updatedItems,
-                    // Update endTime if auto is enabled
-                    endTime: f.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(updatedItems) ?? f.endTime) : f.endTime,
-                  };
-                });
-              }}
-            >
-              + Add schedule item
-            </Button>
+                <Button
+                  variant="secondary"
+                  className="mt-6"
+                  onClick={() => {
+                    setForm((f) => {
+                      const newItem = { id: generateId(), time: "12:00", description: "", staffInstructions: undefined, guestInstructions: undefined, notes: undefined };
+                      const updatedItems = [...f.scheduleItems, newItem];
+                      return {
+                        ...f,
+                        scheduleItems: updatedItems,
+                        // Update endTime if auto is enabled
+                        endTime: f.endTimeFixed === false ? (calculateEndTimeFromScheduleItems(updatedItems) ?? f.endTime) : f.endTime,
+                      };
+                    });
+                  }}
+                >
+                  + Add schedule item
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div>
-          <div className="mb-1 text-sm font-medium">Notes</div>
-          <Input
-            value={form.notes}
-            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-            placeholder="Optional"
-          />
-        </div>
-
-        <div className="flex items-center justify-end gap-2 pt-4 border-t">
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end gap-2">
           <Link href={`/admin/days/${dayId}`}>
-            <Button variant="secondary">Cancel</Button>
+            <Button variant="ghost">Cancel</Button>
           </Link>
-          <Button onClick={saveForm} disabled={saving}>
-            {saving ? "Saving…" : isNew ? "Create Block" : "Save Changes"}
+          <Button variant="secondary" onClick={saveForm} disabled={saving}>
+            {saving ? "Saving…" : isNew ? "Create Event" : "Save Changes"}
           </Button>
         </div>
       </div>
