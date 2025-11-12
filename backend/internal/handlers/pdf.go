@@ -181,6 +181,11 @@ func (h *Handlers) ExportPDF(w http.ResponseWriter, r *http.Request) {
 
 	// Section: Days - all pages are landscape
 	for _, d := range days {
+		// Skip days with no blocks and no movements
+		if len(d.Blocks) == 0 && len(d.Movements) == 0 {
+			continue
+		}
+
 		// Set current day's date for header callback
 		currentDayDate = d.Date
 		// Mark that we're no longer on the cover page
