@@ -50,10 +50,9 @@ func NewRouter(cfg config.Config, logger zerolog.Logger, pool *pgxpool.Pool) htt
 		// Admin routes - require admin role
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAdmin)
-			// Users management (admin only)
+			// Users management (admin only) - read-only now, users created via participants
 			r.Route("/admin/users", func(r chi.Router) {
 				r.Get("/", h.ListUsers)
-				r.Post("/", h.CreateUser)
 				r.Route("/{id}", func(r chi.Router) {
 					r.Get("/", h.GetUser)
 					r.Put("/", h.UpdateUser)

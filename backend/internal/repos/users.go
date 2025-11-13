@@ -20,13 +20,13 @@ func (r *UsersRepo) GetByEmail(ctx context.Context, email string) (models.User, 
 	var u models.User
 	var createdAt, updatedAt time.Time
 	err := scanOne(ctx, r.Pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, role, created_at, updated_at
+		SELECT id, email, password_hash, role, is_user_enabled, created_at, updated_at
 		FROM users WHERE email = $1
 	`, email), &u, func() error {
 		return r.Pool.QueryRow(ctx, `
-			SELECT id, email, password_hash, role, created_at, updated_at
+			SELECT id, email, password_hash, role, is_user_enabled, created_at, updated_at
 			FROM users WHERE email = $1
-		`, email).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &createdAt, &updatedAt)
+		`, email).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsUserEnabled, &createdAt, &updatedAt)
 	})
 	if err == nil {
 		u.CreatedAt = createdAt.Format(time.RFC3339)
@@ -39,13 +39,13 @@ func (r *UsersRepo) Get(ctx context.Context, id string) (models.User, error) {
 	var u models.User
 	var createdAt, updatedAt time.Time
 	err := scanOne(ctx, r.Pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, role, created_at, updated_at
+		SELECT id, email, password_hash, role, is_user_enabled, created_at, updated_at
 		FROM users WHERE id = $1
 	`, id), &u, func() error {
 		return r.Pool.QueryRow(ctx, `
-			SELECT id, email, password_hash, role, created_at, updated_at
+			SELECT id, email, password_hash, role, is_user_enabled, created_at, updated_at
 			FROM users WHERE id = $1
-		`, id).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &createdAt, &updatedAt)
+		`, id).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsUserEnabled, &createdAt, &updatedAt)
 	})
 	if err == nil {
 		u.CreatedAt = createdAt.Format(time.RFC3339)
@@ -56,7 +56,7 @@ func (r *UsersRepo) Get(ctx context.Context, id string) (models.User, error) {
 
 func (r *UsersRepo) List(ctx context.Context, p PageParams) ([]models.User, int64, error) {
 	rows, err := r.Pool.Query(ctx, `
-		SELECT id, email, role, created_at, updated_at
+		SELECT id, email, role, is_user_enabled, created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -69,7 +69,7 @@ func (r *UsersRepo) List(ctx context.Context, p PageParams) ([]models.User, int6
 	for rows.Next() {
 		var u models.User
 		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.IsUserEnabled, &createdAt, &updatedAt); err != nil {
 			return nil, 0, err
 		}
 		u.CreatedAt = createdAt.Format(time.RFC3339)
@@ -83,16 +83,16 @@ func (r *UsersRepo) List(ctx context.Context, p PageParams) ([]models.User, int6
 	return items, total, rows.Err()
 }
 
-func (r *UsersRepo) Create(ctx context.Context, email, passwordHash, role string) (models.User, error) {
+func (r *UsersRepo) Create(ctx context.Context, email, passwordHash, role string, isUserEnabled bool) (models.User, error) {
 	id := uuid.NewString()
 	now := time.Now()
 	var u models.User
 	var createdAt, updatedAt time.Time
 	err := r.Pool.QueryRow(ctx, `
-		INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, email, role, created_at, updated_at
-	`, id, email, passwordHash, role, now, now).Scan(&u.ID, &u.Email, &u.Role, &createdAt, &updatedAt)
+		INSERT INTO users (id, email, password_hash, role, is_user_enabled, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, email, role, is_user_enabled, created_at, updated_at
+	`, id, email, passwordHash, role, isUserEnabled, now, now).Scan(&u.ID, &u.Email, &u.Role, &u.IsUserEnabled, &createdAt, &updatedAt)
 	if err == nil {
 		u.CreatedAt = createdAt.Format(time.RFC3339)
 		u.UpdatedAt = updatedAt.Format(time.RFC3339)
@@ -100,7 +100,7 @@ func (r *UsersRepo) Create(ctx context.Context, email, passwordHash, role string
 	return u, err
 }
 
-func (r *UsersRepo) Update(ctx context.Context, id string, email, role *string) (models.User, error) {
+func (r *UsersRepo) Update(ctx context.Context, id string, email, role *string, isUserEnabled *bool) (models.User, error) {
 	now := time.Now()
 	var u models.User
 	var createdAt, updatedAt time.Time
@@ -120,22 +120,38 @@ func (r *UsersRepo) Update(ctx context.Context, id string, email, role *string) 
 		args = append(args, *role)
 		argIdx++
 	}
+	if isUserEnabled != nil {
+		updates = append(updates, "is_user_enabled = $"+itoa(argIdx))
+		args = append(args, *isUserEnabled)
+		argIdx++
+	}
 
 	args = append(args, id)
 	query := `
 		UPDATE users
 		SET ` + joinStrings(updates, ", ") + `
 		WHERE id = $` + itoa(argIdx) + `
-		RETURNING id, email, role, created_at, updated_at
+		RETURNING id, email, role, is_user_enabled, created_at, updated_at
 	`
 
-	err := r.Pool.QueryRow(ctx, query, args...).Scan(&u.ID, &u.Email, &u.Role, &createdAt, &updatedAt)
+	err := r.Pool.QueryRow(ctx, query, args...).Scan(&u.ID, &u.Email, &u.Role, &u.IsUserEnabled, &createdAt, &updatedAt)
 	if err != nil {
 		return models.User{}, err
 	}
 	u.CreatedAt = createdAt.Format(time.RFC3339)
 	u.UpdatedAt = updatedAt.Format(time.RFC3339)
 	return u, nil
+}
+
+// UpdatePassword updates the password hash for a user
+func (r *UsersRepo) UpdatePassword(ctx context.Context, id string, passwordHash string) error {
+	now := time.Now()
+	_, err := r.Pool.Exec(ctx, `
+		UPDATE users
+		SET password_hash = $1, updated_at = $2
+		WHERE id = $3
+	`, passwordHash, now, id)
+	return err
 }
 
 func (r *UsersRepo) Delete(ctx context.Context, id string) error {

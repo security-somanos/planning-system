@@ -77,7 +77,10 @@ export interface Participant {
   email?: string;
   phone?: string;
   languages?: string[]; // languages spoken (e.g., ["English", "Spanish", "French"])
-  assignedBlockIds: ID[] | null; // may be null
+  userId?: ID;
+  assignedBlockIds?: ID[] | null; // may be null
+  isPasswordSet: boolean; // Indicates if the participant has a password set (read-only)
+  isUserEnabled?: boolean | null; // Indicates if the user account is enabled for login (null if no user account exists)
 }
 
 export type LocationType = "hotel" | "venue" | "restaurant" | "generic";
@@ -88,6 +91,8 @@ export interface Location {
   address?: string;
   googleMapsLink?: string;
   type: LocationType;
+  contact?: string[]; // Array of contact information (phone, email, etc.)
+  siteManagerIds?: string[]; // Array of participant IDs who manage this location
 }
 
 export interface Vehicle {

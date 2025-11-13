@@ -38,6 +38,13 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if user is enabled
+	if !user.IsUserEnabled {
+		h.log.Debug().Str("email", req.Email).Msg("login failed: user account is disabled")
+		respond.JSON(w, http.StatusUnauthorized, map[string]string{"error": "user account is disabled"})
+		return
+	}
+
 	// Generate JWT token
 	cfg := config.Load()
 	claims := jwt.MapClaims{

@@ -1760,7 +1760,7 @@ func drawVehicleAssignmentsTable(pdf *gofpdf.Fpdf, m models.Movement, vehByID ma
 	headerRow := TableRow{
 		Cells: []TableCell{
 			{Text: "Vehicle", Align: AlignLeft, ColSpan: 1, FontSize: 9, FontStyle: "B", BackgroundRGB: &headerGradientTopRGB, TextRGB: &headerTextRGB, GradientTopRGB: &headerGradientTopRGB, GradientBotRGB: &headerGradientBotRGB},
-			{Text: "Participants", Align: AlignLeft, ColSpan: 1, FontSize: 9, FontStyle: "B", BackgroundRGB: &headerGradientTopRGB, TextRGB: &headerTextRGB, GradientTopRGB: &headerGradientTopRGB, GradientBotRGB: &headerGradientBotRGB},
+			{Text: "Passangers", Align: AlignLeft, ColSpan: 1, FontSize: 9, FontStyle: "B", BackgroundRGB: &headerGradientTopRGB, TextRGB: &headerTextRGB, GradientTopRGB: &headerGradientTopRGB, GradientBotRGB: &headerGradientBotRGB},
 			{Text: "Make/Model", Align: AlignLeft, ColSpan: 1, FontSize: 9, FontStyle: "B", BackgroundRGB: &headerGradientTopRGB, TextRGB: &headerTextRGB, GradientTopRGB: &headerGradientTopRGB, GradientBotRGB: &headerGradientBotRGB},
 			{Text: "License", Align: AlignLeft, ColSpan: 1, FontSize: 9, FontStyle: "B", BackgroundRGB: &headerGradientTopRGB, TextRGB: &headerTextRGB, GradientTopRGB: &headerGradientTopRGB, GradientBotRGB: &headerGradientBotRGB},
 			{Text: "Seats", Align: AlignLeft, ColSpan: 1, FontSize: 9, FontStyle: "B", BackgroundRGB: &headerGradientTopRGB, TextRGB: &headerTextRGB, GradientTopRGB: &headerGradientTopRGB, GradientBotRGB: &headerGradientBotRGB},

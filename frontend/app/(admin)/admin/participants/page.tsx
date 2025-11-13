@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from "react";
+import { Edit, Trash2, Calendar } from "lucide-react";
 import { AdminLayout } from "../../../../components/layout/AdminLayout";
 import { mockApi } from "../../../../lib/mockApi";
 import { Participant } from "../../../../lib/types";
@@ -25,7 +26,8 @@ export default function ParticipantManagerPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Participant | null>(null);
-  const [form, setForm] = useState<Partial<Participant>>({});
+  const [form, setForm] = useState<Partial<Participant> & { password?: string }>({});
+  const [formError, setFormError] = useState("");
 
   const [viewAgendaFor, setViewAgendaFor] = useState<Participant | null>(null);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
@@ -90,26 +92,81 @@ export default function ParticipantManagerPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", roles: [], email: "", phone: "", languages: [] });
+    setForm({ name: "", roles: [], email: "", phone: "", languages: [], password: "" });
+    setFormError("");
     setRoleSearchQuery("");
     setLanguageSearchQuery("");
     setModalOpen(true);
   };
   const openEdit = (p: Participant) => {
     setEditing(p);
-    setForm({ name: p.name, roles: p.roles, email: p.email, phone: p.phone, languages: p.languages || [] });
+    setForm({ 
+      name: p.name, 
+      roles: p.roles, 
+      email: p.email, 
+      phone: p.phone, 
+      languages: p.languages || [],
+      password: "",
+      isUserEnabled: p.isUserEnabled !== null && p.isUserEnabled !== undefined ? p.isUserEnabled : undefined
+    });
+    setFormError("");
     setRoleSearchQuery("");
     setLanguageSearchQuery("");
     setModalOpen(true);
   };
   const saveForm = async () => {
-    if (editing) {
-      await mockApi.put(`/participants/${editing.id}`, form);
-    } else {
-      await mockApi.post("/participants", form);
+    setFormError("");
+    
+    // Validation: If password is provided, email is required
+    if (form.password && !form.email) {
+      setFormError("Email is required when creating a user account");
+      return;
     }
-    setModalOpen(false);
-    refresh();
+
+    // Validation: If enable login is checked, password is required (unless editing and password already exists)
+    if (form.isUserEnabled && !form.password && (!editing || !editing.isPasswordSet)) {
+      setFormError("Password is required when enabling login");
+      return;
+    }
+
+    try {
+      const payload: any = {
+        name: form.name,
+        roles: form.roles,
+        email: form.email,
+        phone: form.phone,
+        languages: form.languages,
+      };
+
+      if (editing) {
+        // Update participant
+        // Only include password if it's being changed
+        if (form.password) {
+          payload.password = form.password;
+        }
+        
+        // Include isUserEnabled if user account exists or is being created
+        if (editing.userId || form.password) {
+          payload.isUserEnabled = form.isUserEnabled ?? false;
+        }
+        
+        await mockApi.put(`/participants/${editing.id}`, payload);
+      } else {
+        // Create participant
+        // Only include password and isUserEnabled if password is provided
+        if (form.password) {
+          payload.password = form.password;
+          payload.isUserEnabled = form.isUserEnabled ?? false;
+        }
+        
+        await mockApi.post("/participants", payload);
+      }
+      
+      setModalOpen(false);
+      refresh();
+    } catch (err: any) {
+      setFormError(err.response?.data?.error || "Failed to save participant");
+    }
   };
   const remove = async (p: Participant) => {
     if (!confirm("Delete this participant? They will be removed from events.")) return;
@@ -165,21 +222,26 @@ export default function ParticipantManagerPage() {
           {/* Table */}
           <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
             <table className="w-full">
-              <thead className="bg-zinc-50">
+              <thead
+                style={{
+                  background: `linear-gradient(to bottom, rgb(198, 123, 129), rgb(135, 18, 27))`,
+                }}
+              >
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700">Phone</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700">Roles</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700">Languages</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700">Events</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-zinc-700">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(189, 168, 109)' }}>Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(189, 168, 109)' }}>Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(189, 168, 109)' }}>Phone</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(189, 168, 109)' }}>Roles</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(189, 168, 109)' }}>Languages</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(189, 168, 109)' }}>Events</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(189, 168, 109)' }}>Login</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium" style={{ color: 'rgb(189, 168, 109)' }}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200">
                 {paginatedParticipants.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-zinc-500">
+                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-zinc-500">
                       No participants found
                     </td>
                   </tr>
@@ -222,17 +284,40 @@ export default function ParticipantManagerPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-zinc-600">{p.assignedBlockIds?.length ?? 0}</td>
+                      <td className="px-4 py-3 text-sm text-zinc-600">
+                        {p.isUserEnabled === true ? (
+                          <span className="inline-block rounded bg-green-50 px-2 py-0.5 text-xs text-green-700 border border-green-200">
+                            Yes
+                          </span>
+                        ) : (
+                          <span className="inline-block rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
+                            No
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="secondary" size="sm" onClick={() => viewEvents(p)}>
-                            View events
-                          </Button>
-                          <Button variant="secondary" size="sm" onClick={() => openEdit(p)}>
-                            Edit
-                          </Button>
-                          <Button variant="danger" size="sm" onClick={() => remove(p)}>
-                            Delete
-                          </Button>
+                          <button
+                            className="p-1.5 hover:bg-zinc-100 rounded transition-colors"
+                            onClick={() => viewEvents(p)}
+                            title="View events"
+                          >
+                            <Calendar className="h-4 w-4 text-zinc-600" />
+                          </button>
+                          <button
+                            className="p-1.5 hover:bg-zinc-100 rounded transition-colors"
+                            onClick={() => openEdit(p)}
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4 text-zinc-600" />
+                          </button>
+                          <button
+                            className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                            onClick={() => remove(p)}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-[#920712]" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -314,6 +399,11 @@ export default function ParticipantManagerPage() {
           </div>
         }
       >
+        {formError && (
+          <div className="mb-4 rounded bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+            {formError}
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <div className="mb-1 text-sm font-medium">Name</div>
@@ -399,12 +489,55 @@ export default function ParticipantManagerPage() {
             </div>
           </div>
           <div>
-            <div className="mb-1 text-sm font-medium">Email</div>
-            <Input value={form.email ?? ""} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+            <div className="mb-1 text-sm font-medium">Email {form.password ? <span className="text-red-600">*</span> : ""}</div>
+            <Input 
+              value={form.email ?? ""} 
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              required={!!form.password}
+            />
           </div>
           <div>
             <div className="mb-1 text-sm font-medium">Phone</div>
             <Input value={form.phone ?? ""} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+          </div>
+          <div className="sm:col-span-2">
+            <div className="mb-1 text-sm font-medium">Login (optional - creates user account)</div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isUserEnabled"
+                  checked={form.isUserEnabled ?? false}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setForm((f) => ({ 
+                      ...f, 
+                      isUserEnabled: enabled,
+                      // Clear password if disabling login
+                      password: enabled ? f.password : ""
+                    }));
+                  }}
+                  className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="isUserEnabled" className="text-sm text-zinc-700 cursor-pointer">
+                  Enable login for this participant
+                </label>
+              </div>
+              {form.isUserEnabled && (
+                <div>
+                  <div className="mb-1 text-sm font-medium">
+                    {editing && editing.isPasswordSet ? "Update password" : "New password"}
+                    {editing && editing.isPasswordSet && " (leave blank to keep current)"}
+                  </div>
+                  <Input
+                    type="password"
+                    value={form.password ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder={editing && editing.isPasswordSet ? "Enter new password or leave blank" : "Enter password"}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div className="sm:col-span-2">
             <div className="mb-1 text-sm font-medium">Languages</div>

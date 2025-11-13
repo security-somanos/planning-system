@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Edit, Trash2 } from "lucide-react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { mockApi } from "@/lib/mockApi";
 import { Block, BlockType, Day, Location, Movement, Participant, Vehicle } from "@/lib/types";
@@ -9,6 +10,7 @@ import { calculateEndTime } from "@/lib/blockUtils";
 import { calculateArrivalTime, getMovementStartTime } from "@/lib/movementUtils";
 import { generateRouteUrl } from "@/lib/routeUtils";
 import { Button } from "@/components/ui/Button";
+import { Accordion } from "@/components/ui/Accordion";
 
 function BlockBadge({ type }: { type: BlockType }) {
   const cls =
@@ -16,6 +18,17 @@ function BlockBadge({ type }: { type: BlockType }) {
       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
       : "bg-amber-50 text-amber-700 border-amber-200";
   return <span className={`inline-block rounded border px-2 py-0.5 text-xs ${cls}`}>{type}</span>;
+}
+
+function MovementBadge() {
+  return (
+    <span 
+      className="inline-block rounded border px-2 py-0.5 text-xs"
+      style={{ backgroundColor: '#bba26a14', color: '#bba26a', borderColor: '#bba26a' }}
+    >
+      movement
+    </span>
+  );
 }
 
 export default function DayEditorPage() {
@@ -170,96 +183,142 @@ export default function DayEditorPage() {
                 if (timelineItem.type === "block") {
                   const b = timelineItem.item as Block;
                   const blockIdx = day.blocks?.findIndex((blk) => blk.id === b.id) ?? -1;
+                  const endTime = calculateEndTime(b);
+                  const locationName = b.locationId ? locationById.get(b.locationId)?.name : null;
+                  const scheduleItems = b.scheduleItems?.sort((a, b) => a.time.localeCompare(b.time)) || [];
+                  
                   return (
-                    <div key={`block-${b.id}`} className="rounded-lg border border-zinc-200 bg-white p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className="font-medium truncate">{b.title}</div>
-                            <BlockBadge type={b.type} />
-                          </div>
-                          <div className="text-xs text-zinc-600">
-                            {(() => {
-                              const endTime = calculateEndTime(b);
-                              if (endTime) {
-                                return (
-                                  <>
-                                    {b.startTime}–{endTime}
-                                    {b.endTimeFixed === false && (
-                                      <span className="ml-1 text-zinc-400" title="Auto-calculated from schedule items">
-                                        (auto)
-                                      </span>
-                                    )}
-                                  </>
-                                );
-                              }
-                              return b.startTime;
-                            })()}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {blockIdx > 0 && (
-                            <Button variant="secondary" onClick={() => moveBlock(blockIdx, -1)}>
-                              ↑
-                            </Button>
-                          )}
-                          {day.blocks && blockIdx >= 0 && blockIdx < day.blocks.length - 1 && (
-                            <Button variant="secondary" onClick={() => moveBlock(blockIdx, 1)}>
-                              ↓
-                            </Button>
-                          )}
-                          <Link href={`/admin/days/${dayId}/blocks/${b.id}`}>
-                            <Button variant="secondary">Edit</Button>
-                          </Link>
-                          <Button variant="danger" onClick={() => deleteBlock(b.id)}>
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="mt-2 text-sm text-zinc-700">{b.description}</div>
-                      <div className="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                    <div key={`block-${b.id}`}>
+                      {/* Desktop: 2 columns, Mobile: Single column */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Left: Event Card */}
                         <div>
-                          <div className="text-xs text-zinc-500">Location</div>
-                          <div>{b.locationId ? locationById.get(b.locationId)?.name : "-"}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-zinc-500">Participants</div>
-                          <div className="truncate">
-                            {b.participantsIds?.map((pid: string) => participantById.get(pid)?.name).filter(Boolean).join(", ") ||
-                              "-"}
-                          </div>
-                        </div>
-                      </div>
-                      {b.scheduleItems && b.scheduleItems.length > 0 && (
-                        <div className="mt-3 border-t border-zinc-200 pt-3">
-                          <div className="text-xs font-medium text-zinc-700 mb-2">Schedule:</div>
-                          <div className="space-y-2">
-                            {b.scheduleItems
-                              .sort((a, b) => a.time.localeCompare(b.time))
-                              .map((item) => (
-                                <div key={item.id} className="rounded border border-zinc-200 bg-zinc-50 p-2">
-                                  <div className="text-xs text-zinc-600 mb-1">
-                                    <span className="font-medium text-zinc-900">{item.time}</span> {item.description}
+                          <Accordion
+                            title={
+                              <div className="flex items-center gap-2">
+                                <div className="font-medium truncate">{b.title}</div>
+                                <BlockBadge type={b.type} />
+                              </div>
+                            }
+                            summary={
+                              <div className="flex items-center gap-4 text-xs text-zinc-600">
+                                <span>
+                                  {endTime ? `${b.startTime}–${endTime}` : b.startTime}
+                                  {b.endTimeFixed === false && (
+                                    <span className="ml-1 text-zinc-400" title="Auto-calculated from schedule items">
+                                      (auto)
+                                    </span>
+                                  )}
+                                </span>
+                                {locationName && <span>📍 {locationName}</span>}
+                              </div>
+                            }
+                            className="bg-[#92071214] shadow-sm"
+                            style={{ borderLeft: '4px solid #920712' }}
+                            actions={
+                              <>
+                                {blockIdx > 0 && (
+                                  <Button variant="secondary" size="sm" onClick={() => moveBlock(blockIdx, -1)}>
+                                    ↑
+                                  </Button>
+                                )}
+                                {day.blocks && blockIdx >= 0 && blockIdx < day.blocks.length - 1 && (
+                                  <Button variant="secondary" size="sm" onClick={() => moveBlock(blockIdx, 1)}>
+                                    ↓
+                                  </Button>
+                                )}
+                                <Link href={`/admin/days/${dayId}/blocks/${b.id}`}>
+                                  <button className="p-1.5 hover:bg-zinc-100 rounded transition-colors" title="Edit">
+                                    <Edit className="h-4 w-4 text-zinc-600" />
+                                  </button>
+                                </Link>
+                                <button 
+                                  className="p-1.5 hover:bg-red-50 rounded transition-colors" 
+                                  onClick={() => deleteBlock(b.id)}
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-4 w-4 text-[#920712]" />
+                                </button>
+                              </>
+                            }
+                          >
+                            <div className="pt-4 space-y-4">
+                              {b.description && <div className="text-sm text-zinc-700">{b.description}</div>}
+                              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                                <div>
+                                  <div className="text-xs text-zinc-500">Location</div>
+                                  <div>{locationName || "-"}</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-zinc-500">Participants</div>
+                                  <div className="truncate">
+                                    {b.participantsIds?.map((pid: string) => participantById.get(pid)?.name).filter(Boolean).join(", ") ||
+                                      "-"}
                                   </div>
-                                  {(item.staffInstructions || item.guestInstructions) && (
-                                    <div className="mt-2 space-y-1 pl-2 border-l-2 border-zinc-300">
-                                      {item.staffInstructions && (
-                                        <div className="text-xs">
-                                          <span className="font-medium text-zinc-700">Staff:</span>{" "}
-                                          <span className="text-zinc-600">{item.staffInstructions}</span>
-                                        </div>
-                                      )}
-                                      {item.guestInstructions && (
-                                        <div className="text-xs">
-                                          <span className="font-medium text-zinc-700">Guest:</span>{" "}
-                                          <span className="text-zinc-600">{item.guestInstructions}</span>
-                                        </div>
-                                      )}
+                                </div>
+                              </div>
+                            </div>
+                          </Accordion>
+                        </div>
+                        
+                        {/* Right: Schedule Items (Desktop only) */}
+                        <div className="hidden md:block space-y-2">
+                          {scheduleItems.length === 0 ? (
+                            <div className="h-1"></div>
+                          ) : (
+                            scheduleItems.map((item) => (
+                              <div key={item.id} className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+                                <div className="text-xs text-zinc-700 mb-1">
+                                  <span className="font-semibold text-zinc-900">{item.time}</span> {item.description}
+                                </div>
+                                {(item.staffInstructions || item.guestInstructions) && (
+                                  <div className="mt-2 space-y-1 pl-2 border-l-2 border-zinc-300">
+                                    {item.staffInstructions && (
+                                      <div className="text-xs">
+                                        <span className="font-medium text-zinc-700">Staff:</span>{" "}
+                                        <span className="text-zinc-600">{item.staffInstructions}</span>
+                                      </div>
+                                    )}
+                                    {item.guestInstructions && (
+                                      <div className="text-xs">
+                                        <span className="font-medium text-zinc-700">Guest:</span>{" "}
+                                        <span className="text-zinc-600">{item.guestInstructions}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Mobile: Schedule Items below */}
+                      {scheduleItems.length > 0 && (
+                        <div className="md:hidden mt-3 space-y-2">
+                          {scheduleItems.map((item) => (
+                            <div key={item.id} className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+                              <div className="text-xs text-zinc-700 mb-1">
+                                <span className="font-semibold text-zinc-900">{item.time}</span> {item.description}
+                              </div>
+                              {(item.staffInstructions || item.guestInstructions) && (
+                                <div className="mt-2 space-y-1 pl-2 border-l-2 border-zinc-300">
+                                  {item.staffInstructions && (
+                                    <div className="text-xs">
+                                      <span className="font-medium text-zinc-700">Staff:</span>{" "}
+                                      <span className="text-zinc-600">{item.staffInstructions}</span>
+                                    </div>
+                                  )}
+                                  {item.guestInstructions && (
+                                    <div className="text-xs">
+                                      <span className="font-medium text-zinc-700">Guest:</span>{" "}
+                                      <span className="text-zinc-600">{item.guestInstructions}</span>
                                     </div>
                                   )}
                                 </div>
-                              ))}
-                          </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -267,118 +326,179 @@ export default function DayEditorPage() {
                 } else {
                   const m = timelineItem.item as Movement;
                   const arrivalTime = calculateArrivalTime(m);
+                  const fromLoc = locationById.get(m.fromLocationId);
+                  const toLoc = locationById.get(m.toLocationId);
+                  const fromLocName = fromLoc?.name ?? "-";
+                  const toLocName = toLoc?.name ?? "-";
+                  
                   return (
-                    <div key={`movement-${m.id}`} className="rounded-lg border border-sky-200 bg-sky-50 p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{m.title}</div>
-                          <div className="text-xs text-zinc-600">
-                            {m.fromTime} → {arrivalTime}
-                            {m.toTimeType === "driving" && (
-                              <span className="ml-1 text-zinc-400" title="Calculated from driving time">
-                                ({m.drivingTimeHours || 0}h {m.drivingTimeMinutes || 0}m)
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Link href={`/admin/days/${dayId}/movements/${m.id}`}>
-                            <Button variant="secondary">Edit</Button>
-                          </Link>
-                          <Button
-                            variant="danger"
-                            onClick={async () => {
-                              if (!confirm("Delete this movement?")) return;
-                              await mockApi.delete(`/days/${dayId}/movements/${m.id}`);
-                              const updated = await mockApi.get<{ item: Day }>(`/days/${dayId}`);
-                              setDay(updated.item);
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                      {m.description && <div className="mt-2 text-sm text-zinc-700">{m.description}</div>}
-                      <div className="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                    <div key={`movement-${m.id}`}>
+                      {/* Desktop: 2 columns, Mobile: Single column */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Left: Movement Card */}
                         <div>
-                          <div className="text-xs text-zinc-500">From</div>
-                          <div>{locationById.get(m.fromLocationId)?.name ?? "-"}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-zinc-500">To</div>
-                          <div>{locationById.get(m.toLocationId)?.name ?? "-"}</div>
-                        </div>
-                      </div>
-                      {(() => {
-                        const fromLoc = locationById.get(m.fromLocationId);
-                        const toLoc = locationById.get(m.toLocationId);
-                        const routeUrl = fromLoc && toLoc ? generateRouteUrl(fromLoc, toLoc) : null;
-                        
-                        if (routeUrl) {
-                          return (
-                            <div className="mt-3 border-t border-sky-200 pt-3">
-                              <div className="mb-2 flex items-center justify-between">
-                                <div className="text-xs font-medium text-zinc-700">Route</div>
-                                <a
-                                  href={routeUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                >
-                                  Open in Google Maps →
-                                </a>
+                          <Accordion
+                            title={
+                              <div className="flex items-center gap-2">
+                                <div className="font-medium truncate">{m.title}</div>
+                                <MovementBadge />
                               </div>
-                              {googleMapsApiKey && fromLoc && toLoc && (fromLoc.address || fromLoc.name) && (toLoc.address || toLoc.name) ? (
-                                <div className="h-64 w-full overflow-hidden rounded border border-sky-300 bg-white">
-                                  <iframe
-                                    width="100%"
-                                    height="100%"
-                                    style={{ border: 0 }}
-                                    loading="lazy"
-                                    allowFullScreen
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                    src={`https://www.google.com/maps/embed/v1/directions?key=${googleMapsApiKey}&origin=${encodeURIComponent(fromLoc.address || fromLoc.name)}&destination=${encodeURIComponent(toLoc.address || toLoc.name)}&mode=driving&zoom=10`}
-                                  />
+                            }
+                            summary={
+                              <div className="flex items-center gap-4 text-xs text-zinc-600">
+                                <span>
+                                  {m.fromTime} → {arrivalTime}
+                                  {m.toTimeType === "driving" && (
+                                    <span className="ml-1 text-zinc-400" title="Calculated from driving time">
+                                      ({m.drivingTimeHours || 0}h {m.drivingTimeMinutes || 0}m)
+                                    </span>
+                                  )}
+                                </span>
+                                <span>📍 {fromLocName} → {toLocName}</span>
+                              </div>
+                            }
+                            className="bg-[#bba26a14] shadow-sm"
+                            style={{ borderLeft: '4px solid #bba26a' }}
+                            actions={
+                              <>
+                                <Link href={`/admin/days/${dayId}/movements/${m.id}`}>
+                                  <button className="p-1.5 hover:bg-zinc-100 rounded transition-colors" title="Edit">
+                                    <Edit className="h-4 w-4 text-zinc-600" />
+                                  </button>
+                                </Link>
+                                <button 
+                                  className="p-1.5 hover:bg-red-50 rounded transition-colors" 
+                                  onClick={async () => {
+                                    if (!confirm("Delete this movement?")) return;
+                                    await mockApi.delete(`/days/${dayId}/movements/${m.id}`);
+                                    const updated = await mockApi.get<{ item: Day }>(`/days/${dayId}`);
+                                    setDay(updated.item);
+                                  }}
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-4 w-4 text-[#920712]" />
+                                </button>
+                              </>
+                            }
+                          >
+                            <div className="pt-4 space-y-4">
+                              {m.description && <div className="text-sm text-zinc-700">{m.description}</div>}
+                              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                                <div>
+                                  <div className="text-xs text-zinc-500">From</div>
+                                  <div>{fromLocName}</div>
                                 </div>
-                              ) : (
-                                <div className="h-64 w-full flex items-center justify-center rounded border border-sky-300 bg-sky-100">
-                                  <div className="text-center text-xs text-zinc-600 p-4">
-                                    <div className="mb-2">Route preview requires Google Maps API key</div>
-                                    <div>Click "Open in Google Maps" to view the route</div>
+                                <div>
+                                  <div className="text-xs text-zinc-500">To</div>
+                                  <div>{toLocName}</div>
+                                </div>
+                              </div>
+                              {(() => {
+                                const routeUrl = fromLoc && toLoc ? generateRouteUrl(fromLoc, toLoc) : null;
+                                
+                                if (routeUrl) {
+                                  return (
+                                    <div className="border-t pt-3" style={{ borderTopColor: '#b34f5980' }}>
+                                      <div className="mb-2 flex items-center justify-between">
+                                        <div className="text-xs font-medium text-zinc-700">Route</div>
+                                        <a
+                                          href={routeUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                        >
+                                          Open in Google Maps →
+                                        </a>
+                                      </div>
+                                      {googleMapsApiKey && fromLoc && toLoc && (fromLoc.address || fromLoc.name) && (toLoc.address || toLoc.name) ? (
+                                        <div className="h-64 w-full overflow-hidden rounded border bg-white" style={{ borderColor: '#b34f5980' }}>
+                                          <iframe
+                                            width="100%"
+                                            height="100%"
+                                            style={{ border: 0 }}
+                                            loading="lazy"
+                                            allowFullScreen
+                                            referrerPolicy="no-referrer-when-downgrade"
+                                            src={`https://www.google.com/maps/embed/v1/directions?key=${googleMapsApiKey}&origin=${encodeURIComponent(fromLoc.address || fromLoc.name)}&destination=${encodeURIComponent(toLoc.address || toLoc.name)}&mode=driving&zoom=10`}
+                                          />
+                                        </div>
+                                      ) : (
+                                        <div className="h-64 w-full flex items-center justify-center rounded border bg-sky-100" style={{ borderColor: '#b34f5980' }}>
+                                          <div className="text-center text-xs text-zinc-600 p-4">
+                                            <div className="mb-2">Route preview requires Google Maps API key</div>
+                                            <div>Click "Open in Google Maps" to view the route</div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              {(m.vehicleAssignments?.length ?? 0) > 0 && (
+                                <div className="border-t pt-3" style={{ borderTopColor: '#b34f5980' }}>
+                                  <div className="text-xs font-medium text-zinc-700 mb-2">Vehicles:</div>
+                                  <div className="space-y-2">
+                                    {m.vehicleAssignments!.map((va, idx) => (
+                                      <div key={idx} className="rounded border bg-white p-2 text-xs" style={{ borderColor: '#b34f5980' }}>
+                                        <div>
+                                          <span className="font-medium">Vehicle:</span>{" "}
+                                          {va.vehicleId ? vehicleById.get(va.vehicleId)?.label ?? "-" : "-"}
+                                        </div>
+                                        {va.driverId && (
+                                          <div>
+                                            <span className="font-medium">Driver:</span> {participantById.get(va.driverId)?.name ?? "-"}
+                                          </div>
+                                        )}
+                                        {va.participantIds && va.participantIds.length > 0 && (
+                                          <div>
+                                            <span className="font-medium">Passengers:</span>{" "}
+                                            {va.participantIds?.map((pid) => participantById.get(pid)?.name).filter(Boolean).join(", ") || "-"}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
                               )}
                             </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                      {(m.vehicleAssignments?.length ?? 0) > 0 && (
-                        <div className="mt-3 border-t border-sky-200 pt-3">
-                          <div className="text-xs font-medium text-zinc-700 mb-2">Vehicles:</div>
-                          <div className="space-y-2">
-                            {m.vehicleAssignments!.map((va, idx) => (
-                              <div key={idx} className="rounded border border-sky-200 bg-white p-2 text-xs">
-                                <div>
-                                  <span className="font-medium">Vehicle:</span>{" "}
-                                  {va.vehicleId ? vehicleById.get(va.vehicleId)?.label ?? "-" : "-"}
-                                </div>
-                                {va.driverId && (
-                                  <div>
-                                    <span className="font-medium">Driver:</span> {participantById.get(va.driverId)?.name ?? "-"}
-                                  </div>
-                                )}
-                                {va.participantIds && va.participantIds.length > 0 && (
-                                  <div>
-                                    <span className="font-medium">Passengers:</span>{" "}
-                                    {va.participantIds?.map((pid) => participantById.get(pid)?.name).filter(Boolean).join(", ") || "-"}
-                                  </div>
-                                )}
+                          </Accordion>
+                        </div>
+                        
+                        {/* Right: Time Information (Desktop only) */}
+                        <div className="hidden md:block space-y-2">
+                          <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+                            <div className="text-xs text-zinc-700 mb-1">
+                              <span className="font-semibold text-zinc-900">{m.fromTime}</span> → <span className="font-semibold text-zinc-900">{arrivalTime}</span>
+                            </div>
+                            <div className="text-xs text-zinc-600 mb-1">
+                              {fromLocName} → {toLocName}
+                            </div>
+                            {m.toTimeType === "driving" && m.drivingTimeHours !== undefined && m.drivingTimeMinutes !== undefined && (
+                              <div className="text-xs text-zinc-600">
+                                <span className="font-medium text-zinc-700">Driving Time:</span> {m.drivingTimeHours}h {m.drivingTimeMinutes}m
                               </div>
-                            ))}
+                            )}
                           </div>
                         </div>
-                      )}
+                      </div>
+                      
+                      {/* Mobile: Time Information below */}
+                      <div className="md:hidden mt-3">
+                        <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+                          <div className="text-xs text-zinc-700 mb-1">
+                            <span className="font-semibold text-zinc-900">{m.fromTime}</span> → <span className="font-semibold text-zinc-900">{arrivalTime}</span>
+                          </div>
+                          <div className="text-xs text-zinc-600 mb-1">
+                            {fromLocName} → {toLocName}
+                          </div>
+                          {m.toTimeType === "driving" && m.drivingTimeHours !== undefined && m.drivingTimeMinutes !== undefined && (
+                            <div className="text-xs text-zinc-600">
+                              <span className="font-medium text-zinc-700">Driving Time:</span> {m.drivingTimeHours}h {m.drivingTimeMinutes}m
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   );
                 }

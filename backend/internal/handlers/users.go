@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"planning-system/backend/internal/models"
 	"planning-system/backend/internal/repos"
 	"planning-system/backend/pkg/respond"
 
@@ -33,69 +32,26 @@ func (h *Handlers) GetUser(w http.ResponseWriter, r *http.Request) {
 	respond.Single(w, http.StatusOK, item)
 }
 
-func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respond.Error(w, http.StatusBadRequest, "invalid json")
-		return
-	}
-
-	if req.Email == "" || req.Password == "" {
-		respond.Error(w, http.StatusBadRequest, "email and password are required")
-		return
-	}
-
-	if req.Role != "admin" && req.Role != "user" {
-		respond.Error(w, http.StatusBadRequest, "role must be 'admin' or 'user'")
-		return
-	}
-
-	// Hash password
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		h.log.Error().Err(err).Msg("failed to hash password")
-		respond.Error(w, http.StatusInternalServerError, "failed to create user")
-		return
-	}
-
-	user, err := h.sv.Users.Create(r.Context(), req.Email, string(passwordHash), req.Role)
-	if err != nil {
-		// Check for unique constraint violation
-		if err.Error() == "duplicate key value violates unique constraint \"users_email_key\"" {
-			respond.Error(w, http.StatusConflict, "email already exists")
-			return
-		}
-		h.log.Error().Err(err).Msg("failed to create user")
-		respond.Error(w, http.StatusInternalServerError, "failed to create user")
-		return
-	}
-
-	respond.Single(w, http.StatusCreated, user)
-}
-
 func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var req models.UpdateUserRequest
+	var req struct {
+		Email         *string `json:"email,omitempty"`
+		Role          *string `json:"role,omitempty"`
+		IsUserEnabled *bool   `json:"isUserEnabled,omitempty"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respond.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 
-	var email *string
-	var role *string
-
-	if req.Email != "" {
-		email = &req.Email
-	}
-	if req.Role != "" {
-		if req.Role != "admin" && req.Role != "user" {
+	if req.Role != nil {
+		if *req.Role != "admin" && *req.Role != "user" {
 			respond.Error(w, http.StatusBadRequest, "role must be 'admin' or 'user'")
 			return
 		}
-		role = &req.Role
 	}
 
-	user, err := h.sv.Users.Update(r.Context(), id, email, role)
+	user, err := h.sv.Users.Update(r.Context(), id, req.Email, req.Role, req.IsUserEnabled)
 	if err != nil {
 		if err == repos.ErrNotFound {
 			respond.Error(w, http.StatusNotFound, "user not found")
@@ -151,7 +107,7 @@ func (h *Handlers) CreateTestUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.sv.Users.Create(r.Context(), testEmail, string(passwordHash), testRole)
+	user, err := h.sv.Users.Create(r.Context(), testEmail, string(passwordHash), testRole, true)
 	if err != nil {
 		h.log.Error().Err(err).Msg("failed to create test user")
 		respond.Error(w, http.StatusInternalServerError, "failed to create user")

@@ -1,11 +1,13 @@
 package models
 
 type Location struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Address        string `json:"address,omitempty"`
-	GoogleMapsLink string `json:"googleMapsLink,omitempty"`
-	Type           string `json:"type,omitempty"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Address        string   `json:"address,omitempty"`
+	GoogleMapsLink string   `json:"googleMapsLink,omitempty"`
+	Type           string   `json:"type,omitempty"`
+	Contact        []string `json:"contact,omitempty"`        // Array of contact information (phone, email, etc.)
+	SiteManagerIDs []string `json:"siteManagerIds,omitempty"` // Array of participant IDs who manage this location
 }
 
 type Vehicle struct {
@@ -30,15 +32,18 @@ type Participant struct {
 	Languages        []string `json:"languages,omitempty"`
 	UserID           *string  `json:"userId,omitempty"`
 	AssignedBlockIDs []string `json:"assignedBlockIds,omitempty"` // derived
+	IsPasswordSet    bool     `json:"isPasswordSet"`              // derived from user.password_hash
+	IsUserEnabled    *bool    `json:"isUserEnabled,omitempty"`    // from user.is_user_enabled
 }
 
 type User struct {
-	ID           string `json:"id"`
-	Email        string `json:"email"`
-	PasswordHash string `json:"-"`    // Never serialize password hash
-	Role         string `json:"role"` // "admin" | "user"
-	CreatedAt    string `json:"createdAt,omitempty"`
-	UpdatedAt    string `json:"updatedAt,omitempty"`
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	PasswordHash  string `json:"-"`    // Never serialize password hash
+	Role          string `json:"role"` // "admin" | "user"
+	IsUserEnabled bool   `json:"isUserEnabled"`
+	CreatedAt     string `json:"createdAt,omitempty"`
+	UpdatedAt     string `json:"updatedAt,omitempty"`
 }
 
 type LoginRequest struct {
@@ -51,15 +56,24 @@ type LoginResponse struct {
 	User  User   `json:"user"`
 }
 
-type CreateUserRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Role     string `json:"role"` // "admin" | "user"
+type CreateParticipantRequest struct {
+	Name          string   `json:"name"`
+	Roles         []string `json:"roles"`
+	Email         string   `json:"email,omitempty"`
+	Phone         string   `json:"phone,omitempty"`
+	Languages     []string `json:"languages,omitempty"`
+	Password      string   `json:"password,omitempty"`      // Optional: if provided, creates user account
+	IsUserEnabled *bool    `json:"isUserEnabled,omitempty"` // Optional: enables login for the user
 }
 
-type UpdateUserRequest struct {
-	Email string `json:"email,omitempty"`
-	Role  string `json:"role,omitempty"`
+type UpdateParticipantRequest struct {
+	Name          string   `json:"name,omitempty"`
+	Roles         []string `json:"roles,omitempty"`
+	Email         string   `json:"email,omitempty"`
+	Phone         string   `json:"phone,omitempty"`
+	Languages     []string `json:"languages,omitempty"`
+	Password      string   `json:"password,omitempty"`      // Optional: if provided, updates/creates password
+	IsUserEnabled *bool    `json:"isUserEnabled,omitempty"` // Optional: enables/disables login
 }
 
 type Event struct {

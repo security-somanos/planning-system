@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
-import { Calendar, Users, Car, MapPin, FileText, UserCog, LogOut, LucideIcon, Menu, X } from "lucide-react";
+import { Calendar, Users, Car, MapPin, FileText, LogOut, LucideIcon, Menu, X } from "lucide-react";
 import { RequireRole } from "../../components/auth/RequireRole";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "../ui/Button";
@@ -10,7 +10,6 @@ import { Button } from "../ui/Button";
 const nav: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/admin", label: "Days", icon: Calendar },
   { href: "/admin/participants", label: "Participants", icon: Users },
-  { href: "/admin/users", label: "Users", icon: UserCog },
   { href: "/admin/vehicles", label: "Vehicles", icon: Car },
   { href: "/admin/locations", label: "Locations", icon: MapPin },
   { href: "/admin/itinerary", label: "Itinerary", icon: FileText },
@@ -27,8 +26,9 @@ function NavLink({ href, label, icon: Icon, onNavigate }: { href: string; label:
       href={href}
       onClick={onNavigate}
       className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-        active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
+        active ? "text-[#bba26a]" : "text-zinc-700 hover:bg-zinc-100"
       }`}
+      style={active ? { backgroundColor: '#bba26a14', borderLeft: '4px solid #bba26a' } : {}}
     >
       <Icon className="h-4 w-4" />
       {label}
@@ -42,7 +42,7 @@ export function AdminLayout({ children, title }: { children: ReactNode; title?: 
 
   const SidebarContent = () => (
     <>
-      <div className="border-b border-zinc-200 p-4 flex-shrink-0">
+      <div className="border-b border-zinc-200 p-4 shrink-0">
         <div className="font-semibold text-zinc-900">Admin</div>
       </div>
       <nav className="flex-1 overflow-y-auto space-y-1 p-3">
@@ -50,7 +50,7 @@ export function AdminLayout({ children, title }: { children: ReactNode; title?: 
           <NavLink key={n.href} href={n.href} label={n.label} icon={n.icon} />
         ))}
       </nav>
-      <div className="border-t border-zinc-200 p-3 flex-shrink-0">
+      <div className="border-t border-zinc-200 p-3 shrink-0">
         <Button variant="secondary" onClick={logout} className="w-full flex items-center justify-center gap-2">
           <LogOut className="h-4 w-4" />
           Logout
@@ -75,7 +75,7 @@ export function AdminLayout({ children, title }: { children: ReactNode; title?: 
             <div className="fixed inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
             <aside className="fixed left-0 top-0 h-full w-64 border-r border-zinc-200 bg-white z-50">
               <div className="flex flex-col h-full w-full">
-                <div className="border-b border-zinc-200 p-4 flex items-center justify-between flex-shrink-0">
+                <div className="border-b border-zinc-200 p-4 flex items-center justify-between shrink-0">
                   <div className="font-semibold text-zinc-900">Admin</div>
                   <button
                     onClick={() => setMobileMenuOpen(false)}
@@ -89,7 +89,7 @@ export function AdminLayout({ children, title }: { children: ReactNode; title?: 
                     <NavLink key={n.href} href={n.href} label={n.label} icon={n.icon} onNavigate={() => setMobileMenuOpen(false)} />
                   ))}
                 </nav>
-                <div className="border-t border-zinc-200 p-3 flex-shrink-0">
+                <div className="border-t border-zinc-200 p-3 shrink-0">
                   <Button variant="secondary" onClick={logout} className="w-full flex items-center justify-center gap-2">
                     <LogOut className="h-4 w-4" />
                     Logout

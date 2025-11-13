@@ -29,13 +29,17 @@ func (r *ParticipantsRepo) List(ctx context.Context, p PageParams, search, role 
 		where = append(where, "EXISTS (SELECT 1 FROM unnest(roles) r WHERE LOWER(r) = $"+itoa(len(args))+")")
 	}
 	q := `
-		SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages, user_id
-		FROM participants
+		SELECT 
+			p.id, p.name, p.roles, COALESCE(p.email,''), COALESCE(p.phone,''), p.languages, p.user_id,
+			COALESCE(u.password_hash IS NOT NULL, false) as is_password_set,
+			u.is_user_enabled
+		FROM participants p
+		LEFT JOIN users u ON p.user_id = u.id
 	`
 	if len(where) > 0 {
 		q += " WHERE " + strings.Join(where, " AND ")
 	}
-	q += " ORDER BY name ASC LIMIT $" + itoa(len(args)+1) + " OFFSET $" + itoa(len(args)+2)
+	q += " ORDER BY p.name ASC LIMIT $" + itoa(len(args)+1) + " OFFSET $" + itoa(len(args)+2)
 	args = append(args, p.Limit, p.Offset)
 	rows, err := r.Pool.Query(ctx, q, args...)
 	if err != nil {
@@ -45,13 +49,15 @@ func (r *ParticipantsRepo) List(ctx context.Context, p PageParams, search, role 
 	items := make([]models.Participant, 0) // Initialize as empty slice, not nil
 	for rows.Next() {
 		var m models.Participant
-		if err := rows.Scan(&m.ID, &m.Name, &m.Roles, &m.Email, &m.Phone, &m.Languages, &m.UserID); err != nil {
+		var isUserEnabled *bool
+		if err := rows.Scan(&m.ID, &m.Name, &m.Roles, &m.Email, &m.Phone, &m.Languages, &m.UserID, &m.IsPasswordSet, &isUserEnabled); err != nil {
 			return nil, 0, err
 		}
+		m.IsUserEnabled = isUserEnabled
 		items = append(items, m)
 	}
 	var total int64
-	countQ := "SELECT COUNT(*) FROM participants"
+	countQ := "SELECT COUNT(*) FROM participants p"
 	if len(where) > 0 {
 		countQ += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -63,15 +69,29 @@ func (r *ParticipantsRepo) List(ctx context.Context, p PageParams, search, role 
 
 func (r *ParticipantsRepo) Get(ctx context.Context, id string) (models.Participant, error) {
 	var m models.Participant
+	var isUserEnabled *bool
 	err := scanOne(ctx, r.Pool.QueryRow(ctx, `
-		SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages, user_id
-		FROM participants WHERE id = $1
+		SELECT 
+			p.id, p.name, p.roles, COALESCE(p.email,''), COALESCE(p.phone,''), p.languages, p.user_id,
+			COALESCE(u.password_hash IS NOT NULL, false) as is_password_set,
+			u.is_user_enabled
+		FROM participants p
+		LEFT JOIN users u ON p.user_id = u.id
+		WHERE p.id = $1
 	`, id), &m, func() error {
 		return r.Pool.QueryRow(ctx, `
-			SELECT id, name, roles, COALESCE(email,''), COALESCE(phone,''), languages, user_id
-			FROM participants WHERE id = $1
-		`, id).Scan(&m.ID, &m.Name, &m.Roles, &m.Email, &m.Phone, &m.Languages, &m.UserID)
+			SELECT 
+				p.id, p.name, p.roles, COALESCE(p.email,''), COALESCE(p.phone,''), p.languages, p.user_id,
+				COALESCE(u.password_hash IS NOT NULL, false) as is_password_set,
+				u.is_user_enabled
+			FROM participants p
+			LEFT JOIN users u ON p.user_id = u.id
+			WHERE p.id = $1
+		`, id).Scan(&m.ID, &m.Name, &m.Roles, &m.Email, &m.Phone, &m.Languages, &m.UserID, &m.IsPasswordSet, &isUserEnabled)
 	})
+	if err == nil {
+		m.IsUserEnabled = isUserEnabled
+	}
 	return m, err
 }
 

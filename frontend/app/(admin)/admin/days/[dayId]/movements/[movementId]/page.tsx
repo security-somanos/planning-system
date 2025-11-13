@@ -129,6 +129,7 @@ function SortableVehicleAssignment({
   onRemove,
   activeParticipantId,
   setActiveParticipantId,
+  onNewDriver,
 }: {
   va: VehicleAssignment;
   idx: number;
@@ -141,6 +142,7 @@ function SortableVehicleAssignment({
   onRemove: (idx: number) => void;
   activeParticipantId: string | null;
   setActiveParticipantId: (id: string | null) => void;
+  onNewDriver: (vehicleAssignmentIdx: number) => void;
 }) {
   const {
     attributes,
@@ -198,7 +200,14 @@ function SortableVehicleAssignment({
             <div className="mb-1 text-xs font-medium">Driver</div>
             <Select
               value={va.driverId ?? ""}
-              onChange={(e) => onUpdate(idx, { driverId: e.target.value || undefined })}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__new__") {
+                  onNewDriver(idx);
+                  return;
+                }
+                onUpdate(idx, { driverId: v || undefined });
+              }}
             >
               <option value="">No driver</option>
               {drivers.map((d) => (
@@ -206,6 +215,7 @@ function SortableVehicleAssignment({
                   {d.name}
                 </option>
               ))}
+              <option value="__new__">+ New driver…</option>
             </Select>
           </div>
           <div className="flex items-end">
@@ -432,6 +442,12 @@ export default function MovementEditorPage() {
     address: "",
     googleMapsLink: "",
   });
+  const [newDriverOpen, setNewDriverOpen] = useState<{ vehicleAssignmentIdx: number } | false>(false);
+  const [newDriverForm, setNewDriverForm] = useState<{ name: string; email?: string; phone?: string }>({
+    name: "",
+    email: "",
+    phone: "",
+  });
   const [participantSearchQueries, setParticipantSearchQueries] = useState<Record<number, string>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null);
@@ -556,6 +572,22 @@ export default function MovementEditorPage() {
     setNewLocationForm({ name: "", type: "generic", address: "", googleMapsLink: "" });
   };
 
+  const createDriver = async () => {
+    if (!newDriverForm.name) return;
+    const driverData = {
+      ...newDriverForm,
+      roles: ["Drivers"],
+    };
+    const res = await mockApi.post<{ item: Participant }>("/participants", driverData);
+    setParticipants((prev) => [...prev, res.item]);
+    if (newDriverOpen && typeof newDriverOpen === 'object') {
+      // Update the vehicle assignment with the new driver
+      updateVehicleAssignment(newDriverOpen.vehicleAssignmentIdx, { driverId: res.item.id });
+    }
+    setNewDriverOpen(false);
+    setNewDriverForm({ name: "", email: "", phone: "" });
+  };
+
   const saveForm = async () => {
     // Validate capacity
     for (const va of form.vehicleAssignments || []) {
@@ -638,8 +670,11 @@ export default function MovementEditorPage() {
         )}
 
         {/* Trip Information Card */}
-        <div className="rounded-lg border border-zinc-200 bg-white p-6">
-          <div className="space-y-6">
+        <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+          <div className="h-[40px] flex items-center rounded-t-lg" style={{ backgroundColor: '#b34f59', borderBottom: '1px solid #920712' }}>
+            <h2 className="text-lg font-semibold text-white px-6">Information</h2>
+          </div>
+          <div className="p-6 space-y-6">
             <div>
               <div className="mb-1 text-sm font-medium">Title</div>
               <Input
@@ -817,10 +852,12 @@ export default function MovementEditorPage() {
         </div>
 
         {/* Vehicle Assignments Card */}
-        <div className="rounded-lg border border-zinc-200 bg-white p-6">
-          <div className="space-y-6">
+        <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+          <div className="h-[40px] flex items-center rounded-t-lg" style={{ backgroundColor: '#b34f59', borderBottom: '1px solid #920712' }}>
+            <h2 className="text-lg font-semibold text-white px-6">Vehicle Assignments</h2>
+          </div>
+          <div className="p-6 space-y-6">
             <div>
-              <div className="mb-4 text-sm font-medium">Vehicle Assignments</div>
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -846,6 +883,7 @@ export default function MovementEditorPage() {
                         onRemove={removeVehicleAssignment}
                         activeParticipantId={activeParticipantId}
                         setActiveParticipantId={setActiveParticipantId}
+                        onNewDriver={(vehicleAssignmentIdx) => setNewDriverOpen({ vehicleAssignmentIdx })}
                       />
                     ))}
                   </div>
@@ -958,6 +996,51 @@ export default function MovementEditorPage() {
             <Input
               value={newLocationForm.address ?? ""}
               onChange={(e) => setNewLocationForm((f) => ({ ...f, address: e.target.value }))}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* New Driver modal */}
+      <Modal
+        open={!!newDriverOpen}
+        onClose={() => {
+          setNewDriverOpen(false);
+          setNewDriverForm({ name: "", email: "", phone: "" });
+        }}
+        title="New driver"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="secondary" onClick={() => {
+              setNewDriverOpen(false);
+              setNewDriverForm({ name: "", email: "", phone: "" });
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={createDriver}>Create</Button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <div className="mb-1 text-sm font-medium">Name</div>
+            <Input
+              value={newDriverForm.name}
+              onChange={(e) => setNewDriverForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </div>
+          <div>
+            <div className="mb-1 text-sm font-medium">Email</div>
+            <Input
+              value={newDriverForm.email ?? ""}
+              onChange={(e) => setNewDriverForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </div>
+          <div>
+            <div className="mb-1 text-sm font-medium">Phone</div>
+            <Input
+              value={newDriverForm.phone ?? ""}
+              onChange={(e) => setNewDriverForm((f) => ({ ...f, phone: e.target.value }))}
             />
           </div>
         </div>
