@@ -225,6 +225,7 @@ const participants: Participant[] = [
     phone: "+1234567890",
     languages: ["English", "French"],
     assignedBlockIds: ["b1", "b2", "b3", "b5", "b6", "b7"],
+    isPasswordSet: false,
   },
   {
     id: p2Id,
@@ -234,6 +235,7 @@ const participants: Participant[] = [
     phone: "+1987654321",
     languages: ["English", "Spanish", "Chinese (Mandarin)"],
     assignedBlockIds: ["b1", "b2", "b3", "b5", "b7", "b9"],
+    isPasswordSet: false,
   },
   {
     id: p3Id,
@@ -243,6 +245,7 @@ const participants: Participant[] = [
     phone: "+1098765432",
     languages: ["English", "Turkish"],
     assignedBlockIds: ["b1", "b2", "b5", "b6", "b7"],
+    isPasswordSet: false,
   },
 ];
 
